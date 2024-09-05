@@ -2,6 +2,12 @@
 # of short time brownian motion by embedding the memory dependent kernal into Markovian
 # states
 
+# TODO Follow the approach in the Hanggi papers to arrive at equation A.1 from Gomez-Solano
+# TODO Find how to arrive at the system of coupled equations from the memory kernal A.1
+# TODO Ensure that the rescaling process is accurate
+# TODO Use the Euler-Maruyama method to discretize A.2
+# TODO Figure out why the parameters n, b, c, v_0, were set as stated
+
 import math
 import numpy as np
 import matplotlib.pyplot as plt
@@ -22,11 +28,15 @@ class MarkovianEmbeddingProcess:
         self.delta = delta
         self.timestep = timestep
         self.curr_x = 0
+        # TODO - Should v be initialized from a distribution with variance kBT/M?
         self.curr_v = 0
         self.curr_u = [np.random.normal(0, math.sqrt(var)) for var in gamma_i]
         self.all_x = [self.curr_x]
         self.all_v = [self.curr_v]
         self.all_u = [self.curr_u]
+
+        self.pacf = 0
+        self.vacf = 0
 
     # Begin stepping. At each step we generate N+1 random numbers from the standard
     # normal distribution. We use these to calculate u, v, and x. We save the values from this state and
@@ -49,10 +59,54 @@ class MarkovianEmbeddingProcess:
         self.curr_v = next_v
         self.curr_u = next_u
 
+    # Function to graph all x positions
     def graph_x(self):
         plt.plot(self.all_x)
         plt.show()
 
+    # Function to graph all velocities
+    def graph_v(self):
+        plt.plot(self.all_v)
+        plt.show()
+
+    def compute_PACF(self, lag_fraction=0.1):
+        N = len(self.all_x)
+        max_lag = int(lag_fraction * N)
+        mean_x = np.mean(self.all_x)
+        x_centered = [x - mean_x for x in self.all_x]
+        acf = np.correlate(x_centered, x_centered, mode='full')  # Compute correlation
+        acf = acf[N:N + max_lag]  # Keep positive lags only, up to max_lag
+
+        # Normalize by the number of terms contributing to each lag
+        acf /= np.arange(N - 1, N - max_lag - 1, -1)
+
+        # Normalize ACF so that ACF(0) = 1
+        acf /= acf[0]
+        self.pacf = acf
+
+    def compute_VACF(self, lag_fraction=0.01):
+        N = len(self.all_v)
+        max_lag = int(lag_fraction * N)
+
+        acf = np.correlate(self.all_v, self.all_v, mode='full')  # Compute correlation
+        acf = acf[N:N + max_lag]  # Keep positive lags only, up to max_lag
+
+        # Normalize by the number of terms contributing to each lag
+        acf /= np.arange(N - 1, N - max_lag - 1, -1)
+
+        # Normalize ACF so that ACF(0) = 1
+        acf /= acf[0]
+        self.vacf = acf
+
+    def graph_PACF(self):
+        plt.plot(self.pacf)
+        plt.show()
+
+    def graph_VACF(self):
+        plt.plot(self.vacf)
+        plt.xscale('log')  # Logarithmic scale on x-axis
+        plt.yscale('log')  # Logarithmic scale on y-axis
+        plt.show()
 
 def run():
     # PARAMETERS
@@ -77,9 +131,14 @@ def run():
     delta = gamma_0/gamma
 
     mep = MarkovianEmbeddingProcess(n, v_i, gamma_i, delta, timestep)
-    for i in range(10000):
+    for i in range(100000):
         mep.compute_next_state()
     mep.graph_x()
+    mep.graph_v()
+    mep.compute_PACF()
+    mep.graph_PACF()
+    mep.compute_VACF()
+    mep.graph_VACF()
 
 if __name__ == '__main__':
     run()
