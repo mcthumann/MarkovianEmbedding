@@ -35,8 +35,17 @@ class MarkovianEmbeddingProcess:
         self.all_v = [self.curr_v]
         self.all_u = [self.curr_u]
 
-        self.pacf = 0
-        self.vacf = 0
+        self.all_pacf = []
+        self.all_vacf = []
+        self.all_msd = []
+
+    def clear_trace(self):
+        self.curr_x = 0
+        self.curr_v = 0
+        self.curr_u = [np.random.normal(0, math.sqrt(var)) for var in self.gamma_i]
+        self.all_x = [self.curr_x]
+        self.all_v = [self.curr_v]
+        self.all_u = [self.curr_u]
 
     # Begin stepping. At each step we generate N+1 random numbers from the standard
     # normal distribution. We use these to calculate u, v, and x. We save the values from this state and
@@ -61,13 +70,11 @@ class MarkovianEmbeddingProcess:
 
     # Function to graph all x positions
     def graph_x(self):
-        plt.plot(self.all_x)
-        plt.show()
+        plt.plot(self.all_x, linewidth=0.5)
 
     # Function to graph all velocities
     def graph_v(self):
         plt.plot(self.all_v)
-        plt.show()
 
     def compute_PACF(self, lag_fraction=0.1):
         N = len(self.all_x)
@@ -82,7 +89,7 @@ class MarkovianEmbeddingProcess:
 
         # Normalize ACF so that ACF(0) = 1
         acf /= acf[0]
-        self.pacf = acf
+        self.all_pacf.append(acf)
 
     def compute_VACF(self, lag_fraction=0.01):
         N = len(self.all_v)
@@ -96,16 +103,34 @@ class MarkovianEmbeddingProcess:
 
         # Normalize ACF so that ACF(0) = 1
         acf /= acf[0]
-        self.vacf = acf
+        self.all_vacf.append(acf)
+
+    def compute_MSD(self):
+        n = len(self.all_x)
+        msd = np.zeros(n)
+        for delta_t in range(1, n):
+            displacements = [(self.all_x[i + delta_t] - self.all_x[i]) ** 2 for i in range(n - delta_t)]
+            msd[delta_t] = np.mean(displacements)
+        self.all_msd.append(msd)
 
     def graph_PACF(self):
-        plt.plot(self.pacf)
+        all_pacf_np = np.array(self.all_pacf)
+        mean_pacf = np.mean(all_pacf_np, axis = 0)
+        plt.plot(mean_pacf)
         plt.show()
 
     def graph_VACF(self):
-        plt.plot(self.vacf)
+        all_vacf_np = np.array(self.all_vacf)
+        mean_vacf = np.mean(all_vacf_np, axis=0)
+        plt.plot(mean_vacf)
         plt.xscale('log')  # Logarithmic scale on x-axis
         plt.yscale('log')  # Logarithmic scale on y-axis
+        plt.show()
+
+    def graph_MSD(self):
+        all_msd_np = np.array(self.all_msd)
+        mean_msd = np.mean(all_msd_np, axis = 0)
+        plt.plot(mean_msd)
         plt.show()
 
 def run():
@@ -131,14 +156,19 @@ def run():
     delta = gamma_0/gamma
 
     mep = MarkovianEmbeddingProcess(n, v_i, gamma_i, delta, timestep)
-    for i in range(100000):
-        mep.compute_next_state()
-    mep.graph_x()
-    mep.graph_v()
-    mep.compute_PACF()
+    for i in range(100):
+        for j in range(10000):
+            mep.compute_next_state()
+        mep.graph_x()
+        mep.compute_PACF()
+        mep.compute_VACF()
+        mep.compute_MSD()
+        mep.clear_trace()
+
+    plt.show()
     mep.graph_PACF()
-    mep.compute_VACF()
     mep.graph_VACF()
+    mep.graph_MSD()
 
 if __name__ == '__main__':
     run()
