@@ -8,6 +8,7 @@
 # TODO Use the Euler-Maruyama method to discretize A.2
 # TODO Figure out why the parameters n, b, c, v_0, were set as stated
 
+# TODO add the looping to the mep
 import math
 import numpy as np
 import matplotlib.pyplot as plt
@@ -58,23 +59,31 @@ class MarkovianEmbeddingProcess:
     # Begin stepping. At each step we generate N+1 random numbers from the standard
     # normal distribution. We use these to calculate u, v, and x. We save the values from this state and
     # continue on tho generate the next state.
-    def compute_next_state(self):
-        N_i = np.random.normal(0,1, self.n+1)
-        N_0 = sum([math.sqrt(self.gamma_i[j]/(self.v_i[j]*self.delta))*N_i[j] for j in range(self.n)])
+    def compute_next_state(self, sample_rate=10):
+        curr_u = self.curr_u
+        curr_v = self.curr_v
+        curr_x = self.curr_x
 
-        next_u = [((1 - self.v_i[j]*self.timestep)*self.curr_u[j] - self.gamma_i[j]*self.timestep*self.curr_v +
-                   math.sqrt(2*self.gamma_i[j]*self.v_i[j]*self.timestep)*N_i[j]) for j in range(self.n)]
-        next_v = ((1 - (1+self.delta)*self.timestep)*self.curr_v + - self.timestep*sum(self.curr_u) +
-                  math.sqrt(2*self.timestep)*(math.sqrt(self.delta)*N_0 + N_i[self.n]))
-        next_x = self.curr_x + self.timestep*self.curr_v
+        for k in range(sample_rate):
+            N_i = np.random.normal(0,1, self.n+1)
+            N_0 = sum([math.sqrt(self.gamma_i[j]/(self.v_i[j]*self.delta))*N_i[j] for j in range(self.n)])
 
-        self.all_x.append(next_x)
-        self.all_v.append(next_v)
-        self.all_u.append(next_u)
+            next_u = [((1 - self.v_i[j]*self.timestep)*curr_u[j] - self.gamma_i[j]*self.timestep*curr_v +
+                       math.sqrt(2*self.gamma_i[j]*self.v_i[j]*self.timestep)*N_i[j]) for j in range(self.n)]
+            next_v = ((1 - (1+self.delta)*self.timestep)*curr_v + - self.timestep*sum(curr_u) +
+                      math.sqrt(2*self.timestep)*(math.sqrt(self.delta)*N_0 + N_i[self.n]))
+            next_x = curr_x + self.timestep*curr_v
+            curr_u = next_u
+            curr_v = next_v
+            curr_x = next_x
 
-        self.curr_x = next_x
-        self.curr_v = next_v
-        self.curr_u = next_u
+        self.all_x.append(curr_x)
+        self.all_v.append(curr_v)
+        self.all_u.append(curr_u)
+
+        self.curr_x = curr_x
+        self.curr_v = curr_v
+        self.curr_u = curr_u
 
     # Function to graph all x positions
     def graph_x(self):
@@ -118,14 +127,14 @@ class MarkovianEmbeddingProcess:
     def compute_MSD(self, lag_fraction=0.1, skip_lags=1, transient=0.0):
         # Apply transient trimming to the time trace
         trace = np.array(self.all_x[int(transient * len(self.all_x)):])
-        n = len(trace)
+        N = len(trace)
         max_lag = int(lag_fraction * N)
 
         # Initialize MSD array
-        msd = np.zeros(n)
+        msd = np.zeros(max_lag)
 
         # Loop over time lags but only compute MSD for every `skip_lags` lag
-        for delta_t in range(1, n, skip_lags):
+        for delta_t in range(1, max_lag, skip_lags):
             # Use vectorized operation to compute displacements for this delta_t
             displacements = trace[delta_t:] - trace[:-delta_t]
             squared_displacements = displacements ** 2
@@ -155,6 +164,8 @@ class MarkovianEmbeddingProcess:
         all_msd_np = np.array(self.all_msd)
         mean_msd = np.mean(all_msd_np, axis = 0)
         plt.plot(mean_msd)
+        plt.xscale('log')
+        plt.yscale('log')
         plt.show()
 
 def run():
