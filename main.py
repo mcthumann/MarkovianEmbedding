@@ -22,26 +22,34 @@ class MarkovianEmbeddingProcess:
     # First, we initialize x, v and u appropriately. Entries of u should be initialized by sampling randomly
     # from a gaussian distribution with mean 0 and variance gamma_i.
     def __init__(self, n, v_i, gamma_i, delta, timestep):
+        # Parameters
         self.n = n # Number of auxliary stochastic variables
         self.v_i = v_i
         self.gamma_i = gamma_i
         self.delta = delta
         self.timestep = timestep
+
+        # Single step variables
         self.curr_x = 0
-        # TODO - Should v be initialized from a distribution with variance kBT/M?
-        self.curr_v = 0
+        self.curr_v = np.random.normal(0, 1)
         self.curr_u = [np.random.normal(0, math.sqrt(var)) for var in gamma_i]
+
+        # Memory for single time trace
         self.all_x = [self.curr_x]
         self.all_v = [self.curr_v]
         self.all_u = [self.curr_u]
 
+        # Memory of multiple traces
         self.all_pacf = []
         self.all_vacf = []
         self.all_msd = []
 
-    def clear_trace(self):
+    # reset_trace() should be called at the end of simulating a single time trace. It will
+    # set the variables to initial conditions, add the time trace correlation function and
+    # MSD to memory, and clear the last time trace from memory
+    def reset_trace(self):
         self.curr_x = 0
-        self.curr_v = 0
+        self.curr_v = np.random.normal(0, 1)
         self.curr_u = [np.random.normal(0, math.sqrt(var)) for var in self.gamma_i]
         self.all_x = [self.curr_x]
         self.all_v = [self.curr_v]
@@ -74,13 +82,14 @@ class MarkovianEmbeddingProcess:
 
     # Function to graph all velocities
     def graph_v(self):
-        plt.plot(self.all_v)
+        plt.plot(self.all_v, linewidth=0.5)
 
-    def compute_PACF(self, lag_fraction=0.1):
-        N = len(self.all_x)
+    def compute_PACF(self, lag_fraction=0.1, transient=0.0):
+        trace = self.all_x[int(transient * len(self.all_x)):]
+        N = len(trace)
         max_lag = int(lag_fraction * N)
-        mean_x = np.mean(self.all_x)
-        x_centered = [x - mean_x for x in self.all_x]
+        mean_x = np.mean(trace)
+        x_centered = [x - mean_x for x in trace]
         acf = np.correlate(x_centered, x_centered, mode='full')  # Compute correlation
         acf = acf[N:N + max_lag]  # Keep positive lags only, up to max_lag
 
@@ -91,11 +100,12 @@ class MarkovianEmbeddingProcess:
         acf /= acf[0]
         self.all_pacf.append(acf)
 
-    def compute_VACF(self, lag_fraction=0.01):
-        N = len(self.all_v)
+    def compute_VACF(self, lag_fraction=0.01, transient = 0.0):
+        trace = self.all_v[int(transient * len(self.all_v)):]
+        N = len(trace)
         max_lag = int(lag_fraction * N)
 
-        acf = np.correlate(self.all_v, self.all_v, mode='full')  # Compute correlation
+        acf = np.correlate(trace, trace, mode='full')  # Compute correlation
         acf = acf[N:N + max_lag]  # Keep positive lags only, up to max_lag
 
         # Normalize by the number of terms contributing to each lag
@@ -105,26 +115,40 @@ class MarkovianEmbeddingProcess:
         acf /= acf[0]
         self.all_vacf.append(acf)
 
-    def compute_MSD(self):
-        n = len(self.all_x)
+    def compute_MSD(self, lag_fraction=0.1, skip_lags=1, transient=0.0):
+        # Apply transient trimming to the time trace
+        trace = np.array(self.all_x[int(transient * len(self.all_x)):])
+        n = len(trace)
+        max_lag = int(lag_fraction * N)
+
+        # Initialize MSD array
         msd = np.zeros(n)
-        for delta_t in range(1, n):
-            displacements = [(self.all_x[i + delta_t] - self.all_x[i]) ** 2 for i in range(n - delta_t)]
-            msd[delta_t] = np.mean(displacements)
+
+        # Loop over time lags but only compute MSD for every `skip_lags` lag
+        for delta_t in range(1, n, skip_lags):
+            # Use vectorized operation to compute displacements for this delta_t
+            displacements = trace[delta_t:] - trace[:-delta_t]
+            squared_displacements = displacements ** 2
+
+            # Compute the mean of squared displacements for this lag
+            msd[delta_t] = np.mean(squared_displacements)
+
+        # Append the computed MSD for this trace
         self.all_msd.append(msd)
 
     def graph_PACF(self):
         all_pacf_np = np.array(self.all_pacf)
         mean_pacf = np.mean(all_pacf_np, axis = 0)
         plt.plot(mean_pacf)
+        plt.xscale('log')
+        plt.yscale('log')
         plt.show()
 
     def graph_VACF(self):
         all_vacf_np = np.array(self.all_vacf)
         mean_vacf = np.mean(all_vacf_np, axis=0)
         plt.plot(mean_vacf)
-        plt.xscale('log')  # Logarithmic scale on x-axis
-        plt.yscale('log')  # Logarithmic scale on y-axis
+        plt.xscale('log')
         plt.show()
 
     def graph_MSD(self):
@@ -159,11 +183,11 @@ def run():
     for i in range(100):
         for j in range(10000):
             mep.compute_next_state()
-        mep.graph_x()
+        mep.graph_v()
         mep.compute_PACF()
         mep.compute_VACF()
         mep.compute_MSD()
-        mep.clear_trace()
+        mep.reset_trace()
 
     plt.show()
     mep.graph_PACF()
