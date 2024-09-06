@@ -59,7 +59,7 @@ class MarkovianEmbeddingProcess:
     # Begin stepping. At each step we generate N+1 random numbers from the standard
     # normal distribution. We use these to calculate u, v, and x. We save the values from this state and
     # continue on tho generate the next state.
-    def compute_next_state(self, sample_rate=10):
+    def compute_next_state(self, sample_rate=1):
         curr_u = self.curr_u
         curr_v = self.curr_v
         curr_x = self.curr_x
@@ -84,6 +84,22 @@ class MarkovianEmbeddingProcess:
         self.curr_x = curr_x
         self.curr_v = curr_v
         self.curr_u = curr_u
+
+    def run_numerical_simulation(self, sim_num, trace_len, pacf=True, vacf=True, msd=True, graph_traces=False):
+        for i in range(sim_num):
+            for j in range(trace_len):
+                self.compute_next_state()
+            if graph_traces:
+                self.graph_x()
+            if pacf:
+                self.compute_PACF()
+            if vacf:
+                self.compute_VACF()
+            if msd:
+                self.compute_MSD()
+            self.reset_trace()
+        if graph_traces:
+            plt.show()
 
     # Function to graph all x positions
     def graph_x(self):
@@ -190,17 +206,12 @@ def run():
     gamma_0 = 0.5*gamma*c*sum(math.sqrt(x) for x in v_i)
     delta = gamma_0/gamma
 
-    mep = MarkovianEmbeddingProcess(n, v_i, gamma_i, delta, timestep)
-    for i in range(100):
-        for j in range(10000):
-            mep.compute_next_state()
-        mep.graph_v()
-        mep.compute_PACF()
-        mep.compute_VACF()
-        mep.compute_MSD()
-        mep.reset_trace()
+    simulation_number = 100
+    trace_length = 10000
 
-    plt.show()
+    mep = MarkovianEmbeddingProcess(n, v_i, gamma_i, delta, timestep)
+    mep.run_numerical_simulation(simulation_number, trace_length)
+
     mep.graph_PACF()
     mep.graph_VACF()
     mep.graph_MSD()
