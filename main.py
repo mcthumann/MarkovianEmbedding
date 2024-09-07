@@ -38,6 +38,15 @@ class MarkovianEmbeddingProcess:
         self.mass = mass
         self.gamma = gamma
 
+        self.t_c = 1
+        self.x_c = 1
+        self.v_c = 1
+        if self.temp > 0 and self.mass > 0 and self.gamma > 0:
+            print("Dimensionful quantities")
+            self.v_c = math.sqrt((const.k*self.temp)/self.mass)
+            self.t_c = self.mass/self.gamma
+            self.x_c = self.v_c*self.t_c
+
         # Single step variables
         self.curr_x = 0
         self.curr_v = np.random.normal(0, 1)
@@ -113,24 +122,11 @@ class MarkovianEmbeddingProcess:
 
     # Function to graph all x positions
     def graph_x(self):
-        t_c = 1
-        x_c = 1
-        if self.temp > 0 and self.mass > 0 and self.gamma > 0:
-            print("Dimensionful quantities")
-            t_c = self.mass/self.gamma
-            x_c = math.sqrt((const.k*self.temp)/self.mass)*t_c
-        elif self.temp == -1 and self.mass == -1 and self.gamma == -1:
-            print("Dimensionless quantities")
-        else:
-            print("Error graphing x time trace: Please set temp, mass, and "
-                  "gamma for dimensionalized axis")
-            return
-
-        plt.plot([t*(self.timestep*self.sample_rate)*t_c for t in range(len(self.all_x))], [x*x_c for x in self.all_x], linewidth=0.5)
+        plt.plot([t*(self.timestep*self.sample_rate)*self.t_c for t in range(len(self.all_x))], [x*self.x_c for x in self.all_x], linewidth=0.5)
 
     # Function to graph all velocities
     def graph_v(self):
-        plt.plot(self.all_v, linewidth=0.5)
+        plt.plot([t*(self.timestep*self.sample_rate)*self.t_c for t in range(len(self.all_v))], [v*self.v_c for v in self.all_v], linewidth=0.5)
 
     def compute_PACF(self, lag_fraction=0.1, transient=0.0):
         trace = self.all_x[int(transient * len(self.all_x)):]
@@ -187,7 +183,7 @@ class MarkovianEmbeddingProcess:
     def graph_PACF(self):
         all_pacf_np = np.array(self.all_pacf)
         mean_pacf = np.mean(all_pacf_np, axis = 0)
-        plt.plot(mean_pacf)
+        plt.plot([t*(self.timestep*self.sample_rate)*self.t_c for t in range(len(mean_pacf))], [x/self.x_c**2 for x in mean_pacf])
         plt.xscale('log')
         plt.yscale('log')
         plt.show()
@@ -195,14 +191,14 @@ class MarkovianEmbeddingProcess:
     def graph_VACF(self):
         all_vacf_np = np.array(self.all_vacf)
         mean_vacf = np.mean(all_vacf_np, axis=0)
-        plt.plot(mean_vacf)
+        plt.plot([t*(self.timestep*self.sample_rate)*self.t_c for t in range(len(mean_vacf))], [v/self.v_c**2 for v in mean_vacf])
         plt.xscale('log')
         plt.show()
 
     def graph_MSD(self):
         all_msd_np = np.array(self.all_msd)
         mean_msd = np.mean(all_msd_np, axis = 0)
-        plt.plot(mean_msd)
+        plt.plot([t*(self.timestep*self.sample_rate)*self.t_c for t in range(len(mean_msd))], [x/self.x_c**2 for x in mean_msd])
         plt.xscale('log')
         plt.yscale('log')
         plt.show()
@@ -233,9 +229,9 @@ def run():
     gamma_0 = 0.5*gamma*c*sum(math.sqrt(v*x_c) for v in v_i)
     delta = gamma_0/gamma
 
-    sample_rate = 10
-    simulation_number = 10
-    trace_length = 10**6
+    sample_rate = 1
+    simulation_number = 1
+    trace_length = 10**4
 
     mep = MarkovianEmbeddingProcess(n, v_i, gamma_i, delta, timestep, sample_rate=sample_rate)
     mep.run_numerical_simulation(simulation_number, trace_length, graph_traces=True)
