@@ -11,6 +11,7 @@
 # TODO add the looping to the mep
 import math
 import numpy as np
+from numpy.fft import fft, ifft
 import matplotlib.pyplot as plt
 import scipy.constants as const
 plt.ticklabel_format(style='sci', axis='x', scilimits=(0,0), useMathText=True)
@@ -105,14 +106,19 @@ class MarkovianEmbeddingProcess:
     def run_numerical_simulation(self, sim_num, trace_len, pacf=True, vacf=True, msd=True, graph_traces=False):
         for i in range(sim_num):
             for j in range(trace_len):
+                if j%(int(trace_len/100))==0:
+                    print("#", end="")
                 self.compute_next_state()
             if graph_traces:
                 self.graph_x()
             if pacf:
+                print("Computing PACF")
                 self.compute_PACF()
             if vacf:
+                print("Computing VACF")
                 self.compute_VACF()
             if msd:
+                print("Computing MSD")
                 self.compute_MSD()
             self.reset_trace()
         if graph_traces:
@@ -129,31 +135,42 @@ class MarkovianEmbeddingProcess:
         plt.plot([t*(self.timestep*self.sample_rate)*self.t_c for t in range(len(self.all_v))], [v*self.v_c for v in self.all_v], linewidth=0.5)
 
     def compute_PACF(self, lag_fraction=0.1, transient=0.0):
-        trace = self.all_x[int(transient * len(self.all_x)):]
+        # Remove transient section
+        trace = np.array(self.all_x[int(transient * len(self.all_x)):])
         N = len(trace)
         max_lag = int(lag_fraction * N)
+
+        # Compute the mean and center the trace (vectorized)
         mean_x = np.mean(trace)
-        x_centered = [x - mean_x for x in trace]
-        acf = np.correlate(x_centered, x_centered, mode='full')  # Compute correlation
-        acf = acf[N:N + max_lag]  # Keep positive lags only, up to max_lag
+        x_centered = trace - mean_x
+
+        # Use FFT to compute autocorrelation efficiently
+        f_x = fft(x_centered, n=2 * N)  # Zero-padding to avoid aliasing
+        acf = ifft(f_x * np.conj(f_x)).real[:N]  # Autocorrelation via inverse FFT
+        acf = acf[:max_lag]  # Keep only positive lags, up to max_lag
 
         # Normalize by the number of terms contributing to each lag
-        acf /= np.arange(N - 1, N - max_lag - 1, -1)
+        acf /= np.arange(N, N - max_lag, -1)
 
         # Normalize ACF so that ACF(0) = 1
         acf /= acf[0]
+
+        # Append the computed PACF for this trace
         self.all_pacf.append(acf)
 
-    def compute_VACF(self, lag_fraction=0.01, transient = 0.0):
-        trace = self.all_v[int(transient * len(self.all_v)):]
-        N = len(trace)
+    def compute_VACF(self, lag_fraction=0.01, transient=0.0):
+        # Remove transient section
+        v = self.all_v[int(transient * len(self.all_v)):]
+        N = len(v)
         max_lag = int(lag_fraction * N)
 
-        acf = np.correlate(trace, trace, mode='full')  # Compute correlation
-        acf = acf[N:N + max_lag]  # Keep positive lags only, up to max_lag
+        # Compute correlation using FFT for faster performance
+        f_v = fft(v, n=2 * N)  # zero-pad to double length to avoid aliasing
+        acf = ifft(f_v * np.conj(f_v)).real[:N]  # autocorrelation via inverse FFT
+        acf = acf[:max_lag]  # Keep positive lags only, up to max_lag
 
         # Normalize by the number of terms contributing to each lag
-        acf /= np.arange(N - 1, N - max_lag - 1, -1)
+        acf /= np.arange(N, N - max_lag, -1)
 
         # Normalize ACF so that ACF(0) = 1
         acf /= acf[0]
@@ -168,14 +185,13 @@ class MarkovianEmbeddingProcess:
         # Initialize MSD array
         msd = np.zeros(max_lag)
 
-        # Loop over time lags but only compute MSD for every `skip_lags` lag
+        # Vectorized computation for all lags at once
         for delta_t in range(1, max_lag, skip_lags):
-            # Use vectorized operation to compute displacements for this delta_t
+            # Vectorized displacement calculation: trace[delta_t:] - trace[:-delta_t]
             displacements = trace[delta_t:] - trace[:-delta_t]
-            squared_displacements = displacements ** 2
 
-            # Compute the mean of squared displacements for this lag
-            msd[delta_t] = np.mean(squared_displacements)
+            # Use np.mean to compute the mean squared displacement
+            msd[delta_t] = np.mean(displacements ** 2)
 
         # Append the computed MSD for this trace
         self.all_msd.append(msd)
@@ -183,7 +199,7 @@ class MarkovianEmbeddingProcess:
     def graph_PACF(self):
         all_pacf_np = np.array(self.all_pacf)
         mean_pacf = np.mean(all_pacf_np, axis = 0)
-        plt.plot([t*(self.timestep*self.sample_rate)*self.t_c for t in range(len(mean_pacf))], [x/self.x_c**2 for x in mean_pacf])
+        plt.plot([t*(self.timestep*self.sample_rate)*self.t_c for t in range(np.size(mean_pacf))], mean_pacf)
         plt.xscale('log')
         plt.yscale('log')
         plt.show()
@@ -191,14 +207,14 @@ class MarkovianEmbeddingProcess:
     def graph_VACF(self):
         all_vacf_np = np.array(self.all_vacf)
         mean_vacf = np.mean(all_vacf_np, axis=0)
-        plt.plot([t*(self.timestep*self.sample_rate)*self.t_c for t in range(len(mean_vacf))], [v/self.v_c**2 for v in mean_vacf])
+        plt.plot([t*(self.timestep*self.sample_rate)*self.t_c for t in range(np.size(mean_vacf))], mean_vacf)
         plt.xscale('log')
         plt.show()
 
     def graph_MSD(self):
         all_msd_np = np.array(self.all_msd)
         mean_msd = np.mean(all_msd_np, axis = 0)
-        plt.plot([t*(self.timestep*self.sample_rate)*self.t_c for t in range(len(mean_msd))], [x/self.x_c**2 for x in mean_msd])
+        plt.plot([t*(self.timestep*self.sample_rate)*self.t_c for t in range(np.size(mean_msd))], mean_msd/self.x_c**2)
         plt.xscale('log')
         plt.yscale('log')
         plt.show()
@@ -229,12 +245,12 @@ def run():
     gamma_0 = 0.5*gamma*c*sum(math.sqrt(v*x_c) for v in v_i)
     delta = gamma_0/gamma
 
-    sample_rate = 1
-    simulation_number = 1
-    trace_length = 10**4
+    sample_rate = 10
+    simulation_number = 100
+    trace_length = 10**6
 
-    mep = MarkovianEmbeddingProcess(n, v_i, gamma_i, delta, timestep, sample_rate=sample_rate)
-    mep.run_numerical_simulation(simulation_number, trace_length, graph_traces=True)
+    mep = MarkovianEmbeddingProcess(n, v_i, gamma_i, delta, timestep, sample_rate=sample_rate, temp=temp, mass=M, gamma=gamma)
+    mep.run_numerical_simulation(simulation_number, trace_length, graph_traces=True, msd=True)
 
     mep.graph_PACF()
     mep.graph_VACF()
