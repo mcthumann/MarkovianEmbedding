@@ -12,6 +12,8 @@
 import math
 import numpy as np
 import matplotlib.pyplot as plt
+import scipy.constants as const
+plt.ticklabel_format(style='sci', axis='x', scilimits=(0,0), useMathText=True)
 
 class MarkovianEmbeddingProcess:
     """
@@ -22,13 +24,19 @@ class MarkovianEmbeddingProcess:
     """
     # First, we initialize x, v and u appropriately. Entries of u should be initialized by sampling randomly
     # from a gaussian distribution with mean 0 and variance gamma_i.
-    def __init__(self, n, v_i, gamma_i, delta, timestep):
+    def __init__(self, n, v_i, gamma_i, delta, timestep, sample_rate=10, temp=-1, mass=-1, gamma=-1):
         # Parameters
         self.n = n # Number of auxliary stochastic variables
         self.v_i = v_i
         self.gamma_i = gamma_i
         self.delta = delta
         self.timestep = timestep
+
+        # Optional Params
+        self.sample_rate = sample_rate
+        self.temp = temp
+        self.mass = mass
+        self.gamma = gamma
 
         # Single step variables
         self.curr_x = 0
@@ -59,12 +67,12 @@ class MarkovianEmbeddingProcess:
     # Begin stepping. At each step we generate N+1 random numbers from the standard
     # normal distribution. We use these to calculate u, v, and x. We save the values from this state and
     # continue on tho generate the next state.
-    def compute_next_state(self, sample_rate=1):
+    def compute_next_state(self):
         curr_u = self.curr_u
         curr_v = self.curr_v
         curr_x = self.curr_x
 
-        for k in range(sample_rate):
+        for k in range(self.sample_rate):
             N_i = np.random.normal(0,1, self.n+1)
             N_0 = sum([math.sqrt(self.gamma_i[j]/(self.v_i[j]*self.delta))*N_i[j] for j in range(self.n)])
 
@@ -100,10 +108,25 @@ class MarkovianEmbeddingProcess:
             self.reset_trace()
         if graph_traces:
             plt.show()
+        print("Simulated " + str(trace_len*self.sample_rate) + " points, sampling every " + str(self.sample_rate)
+              + " for a duration of " + str(trace_len*self.sample_rate*self.timestep) + " time constants")
 
     # Function to graph all x positions
     def graph_x(self):
-        plt.plot(self.all_x, linewidth=0.5)
+        t_c = 1
+        x_c = 1
+        if self.temp > 0 and self.mass > 0 and self.gamma > 0:
+            print("Dimensionful quantities")
+            t_c = self.mass/self.gamma
+            x_c = math.sqrt((const.k*self.temp)/self.mass)*t_c
+        elif self.temp == -1 and self.mass == -1 and self.gamma == -1:
+            print("Dimensionless quantities")
+        else:
+            print("Error graphing x time trace: Please set temp, mass, and "
+                  "gamma for dimensionalized axis")
+            return
+
+        plt.plot([t*(self.timestep*self.sample_rate)*t_c for t in range(len(self.all_x))], [x*x_c for x in self.all_x], linewidth=0.5)
 
     # Function to graph all velocities
     def graph_v(self):
@@ -189,28 +212,33 @@ def run():
     n = 13 # Number of auxliary stochastic variables
     b = 5 # Scaling dilation parameter that determines the low cutoff frequency ν_0*b^-n
     c = 1.78167 # a prefactor that depends on the particular choice of b
-    v_0 = 10E3 # High cutoff frequency
-    a = 10E-6 # Particle size
-    eta = 0.89*10E-3 # Viscosity of water
+    v_0 = 1E3 # High cutoff frequency
+    a = 1E-6 # Particle size
+    eta = 0.89*1E-3 # Viscosity of water
     rho_silica = 2200 # Density of silica
     rho_f = 1000 # Density of water
-    M = (4 / 3) * math.pi * a/2.0 ** 3 * rho_silica + .5 * (4 / 3) * math.pi * a/2.0 ** 3 * rho_f # Mass plus added mass
+    M = (4 / 3) * math.pi * (a/2.0)** 3 * rho_silica + .5 * (4 / 3) * math.pi * (a/2.0)** 3 * rho_f # Mass plus added mass
+    temp = 273
 
     # SECONDARY PARAMETERS
     tao_f = (rho_f * a**2)/eta # Characteristic time for vorticy diffusion across length of sphere
     gamma = 6*math.pi*a*eta # Steady-state friction coefficient of the particle
     tao_c = M/gamma # Momentum relaxation time of the particle
-    timestep = 10E-4 # Simulation timestep
+    v_c = math.sqrt((const.k*temp)/M)
+    x_c = tao_c*v_c
+    f_c = (const.k*temp)/x_c
+    timestep = 1E-4 # Simulation timestep
     v_i = [v_0*b**(-i) for i in range(1, n+1)] # Decaying samples from an exponential distribution ...
-    gamma_i = [0.5*gamma*c*math.sqrt(tao_f/math.pi)*(v_i[i]**(3.0/2.0)) for i in range(n)]
-    gamma_0 = 0.5*gamma*c*sum(math.sqrt(x) for x in v_i)
+    gamma_i = [(x_c/f_c)*(0.5*gamma*c*math.sqrt(tao_f/math.pi)*(v_i[i]**(3.0/2.0))) for i in range(n)]
+    gamma_0 = 0.5*gamma*c*sum(math.sqrt(v*x_c) for v in v_i)
     delta = gamma_0/gamma
 
-    simulation_number = 100
-    trace_length = 10000
+    sample_rate = 10
+    simulation_number = 10
+    trace_length = 10**6
 
-    mep = MarkovianEmbeddingProcess(n, v_i, gamma_i, delta, timestep)
-    mep.run_numerical_simulation(simulation_number, trace_length)
+    mep = MarkovianEmbeddingProcess(n, v_i, gamma_i, delta, timestep, sample_rate=sample_rate)
+    mep.run_numerical_simulation(simulation_number, trace_length, graph_traces=True)
 
     mep.graph_PACF()
     mep.graph_VACF()
