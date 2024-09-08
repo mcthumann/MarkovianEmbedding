@@ -9,6 +9,7 @@
 # TODO Figure out why the parameters n, b, c, v_0, were set as stated
 
 # TODO add the looping to the mep
+
 import math
 import numpy as np
 from numpy.fft import fft, ifft
@@ -49,14 +50,14 @@ class MarkovianEmbeddingProcess:
             self.x_c = self.v_c*self.t_c
 
         # Single step variables
-        self.curr_x = 0
-        self.curr_v = np.random.normal(0, 1)
-        self.curr_u = [np.random.normal(0, math.sqrt(var)) for var in gamma_i]
+        self.curr_x = None
+        self.curr_v = None
+        self.curr_u = None
 
         # Memory for single time trace
-        self.all_x = [self.curr_x]
-        self.all_v = [self.curr_v]
-        self.all_u = [self.curr_u]
+        self.all_x = None
+        self.all_v = None
+        self.all_u = None
 
         # Memory of multiple traces
         self.all_pacf = []
@@ -66,18 +67,22 @@ class MarkovianEmbeddingProcess:
     # reset_trace() should be called at the end of simulating a single time trace. It will
     # set the variables to initial conditions, add the time trace correlation function and
     # MSD to memory, and clear the last time trace from memory
-    def reset_trace(self):
+    def reset_trace(self, trace_len):
         self.curr_x = 0
         self.curr_v = np.random.normal(0, 1)
         self.curr_u = [np.random.normal(0, math.sqrt(var)) for var in self.gamma_i]
-        self.all_x = [self.curr_x]
-        self.all_v = [self.curr_v]
-        self.all_u = [self.curr_u]
+        # Allocate arrays and set first value
+        self.all_x = np.zeros(trace_len)
+        self.all_x[0] = self.curr_x
+        self.all_v = np.zeros(trace_len)
+        self.all_v[0] = self.curr_v
+        self.all_u = np.empty(trace_len, dtype=object)
+        self.all_u[0] = self.curr_u
 
     # Begin stepping. At each step we generate N+1 random numbers from the standard
     # normal distribution. We use these to calculate u, v, and x. We save the values from this state and
     # continue on tho generate the next state.
-    def compute_next_state(self):
+    def compute_next_state(self, state_ind):
         curr_u = self.curr_u
         curr_v = self.curr_v
         curr_x = self.curr_x
@@ -95,21 +100,25 @@ class MarkovianEmbeddingProcess:
             curr_v = next_v
             curr_x = next_x
 
-        self.all_x.append(curr_x)
-        self.all_v.append(curr_v)
-        self.all_u.append(curr_u)
+        self.all_x[state_ind] = curr_x
+        self.all_v[state_ind] = curr_v
+        self.all_u[state_ind] = curr_u
 
         self.curr_x = curr_x
         self.curr_v = curr_v
         self.curr_u = curr_u
 
-    def run_numerical_simulation(self, sim_num, trace_len, pacf=True, vacf=True, msd=True, graph_traces=False):
+    def run_numerical_simulation(self, sim_num, trace_len, pacf=True, vacf=True, msd=True, graph=False):
+        print("Will Simulate " + str(trace_len * self.sample_rate) + " points, sampling every " + str(self.sample_rate)
+              + " for a duration of " + str(trace_len * self.sample_rate * self.timestep) + " time constants")
+
+        self.reset_trace(trace_len)
         for i in range(sim_num):
             for j in range(trace_len):
                 if j%(int(trace_len/100))==0:
                     print("#", end="")
-                self.compute_next_state()
-            if graph_traces:
+                self.compute_next_state(j)
+            if graph:
                 self.graph_x()
             if pacf:
                 print("Computing PACF")
@@ -120,23 +129,28 @@ class MarkovianEmbeddingProcess:
             if msd:
                 print("Computing MSD")
                 self.compute_MSD()
-            self.reset_trace()
-        if graph_traces:
+            self.reset_trace(trace_len)
+        if graph:
             plt.show()
-        print("Simulated " + str(trace_len*self.sample_rate) + " points, sampling every " + str(self.sample_rate)
-              + " for a duration of " + str(trace_len*self.sample_rate*self.timestep) + " time constants")
+            if pacf:
+                self.graph_PACF()
+            if vacf:
+                self.graph_VACF()
+            if msd:
+                self.graph_MSD()
+
 
     # Function to graph all x positions
     def graph_x(self):
-        plt.plot([t*(self.timestep*self.sample_rate)*self.t_c for t in range(len(self.all_x))], [x*self.x_c for x in self.all_x], linewidth=0.5)
+        plt.plot([t*(self.timestep*self.sample_rate)*self.t_c for t in range(len(self.all_x))], self.all_x*self.x_c, linewidth=0.5)
 
     # Function to graph all velocities
     def graph_v(self):
-        plt.plot([t*(self.timestep*self.sample_rate)*self.t_c for t in range(len(self.all_v))], [v*self.v_c for v in self.all_v], linewidth=0.5)
+        plt.plot([t*(self.timestep*self.sample_rate)*self.t_c for t in range(len(self.all_v))], self.all_v*self.v_c, linewidth=0.5)
 
     def compute_PACF(self, lag_fraction=0.1, transient=0.0):
         # Remove transient section
-        trace = np.array(self.all_x[int(transient * len(self.all_x)):])
+        trace = self.all_x[int(transient * len(self.all_x)):]
         N = len(trace)
         max_lag = int(lag_fraction * N)
 
@@ -178,7 +192,7 @@ class MarkovianEmbeddingProcess:
 
     def compute_MSD(self, lag_fraction=0.1, skip_lags=1, transient=0.0):
         # Apply transient trimming to the time trace
-        trace = np.array(self.all_x[int(transient * len(self.all_x)):])
+        trace = self.all_x[int(transient * len(self.all_x)):]
         N = len(trace)
         max_lag = int(lag_fraction * N)
 
@@ -250,11 +264,7 @@ def run():
     trace_length = 10**6
 
     mep = MarkovianEmbeddingProcess(n, v_i, gamma_i, delta, timestep, sample_rate=sample_rate, temp=temp, mass=M, gamma=gamma)
-    mep.run_numerical_simulation(simulation_number, trace_length, graph_traces=True, msd=True)
-
-    mep.graph_PACF()
-    mep.graph_VACF()
-    mep.graph_MSD()
+    mep.run_numerical_simulation(simulation_number, trace_length, graph=True, msd=False)
 
 if __name__ == '__main__':
     run()
