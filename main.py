@@ -28,30 +28,31 @@ def run():
     gamma_0 = 0.5*gamma*c*sum(math.sqrt(v*x_c) for v in v_i)
     delta = gamma_0/gamma
 
-    lag_fraction = 0.1
-    sample_rate = 1
-    simulation_number = 1
-    trace_length = 10**6
-
-    acf_time = timestep*sample_rate*trace_length*lag_fraction
-
     # Analytical Params
     c_water = 1500
     bulk = 2.5E-3
-    K = 1E-6  # May need update here
-    k_b = scipy.constants.k
+    K = 1E-5  # May need update here
+
     VSP_length = 1000
     integ_points = 10 ** 4 * 8
-    times = np.logspace(-10, -5, 60)
+    time_duration = -7
+    time_range = (-10, time_duration)
+    time_points = 60
 
-    sol = Analytical_Solution(rho_f, c_water, eta, bulk, a, rho_silica, K, tao_f, m, M, gamma, k_b, temp, VSP_length, integ_points, times)
+    lag_fraction = 0.1
+    sample_rate = 1
+    simulation_number = 10
+
+    trace_length = int((10**time_duration)/(timestep*sample_rate*lag_fraction*tao_c))
+
+    sol = Analytical_Solution(rho_f, c_water, eta, bulk, a, rho_silica, K, tao_f, m, M, gamma, temp, VSP_length, integ_points, time_range=time_range, time_points=time_points)
     times, freq, VSPD_cw, VSPD_iw, PSD_iw, PSD_cw, VACF_cw, VACF_iw, PACF_cw, PACF_iw, TPSD_cw, TPSD_iw = sol.calculate()
 
     mep = MarkovianEmbeddingProcess(n, v_i, gamma_i, delta, timestep, sample_rate=sample_rate, temp=temp, mass=M, gamma=gamma)
     mep.run_numerical_simulation(simulation_number, trace_length, graph=False, msd=False)
 
-    #mep.graph_VACF()
-    plt.semilogx(times, VACF_iw)
+    mep.graph_VACF()
+    plt.semilogx(times, VACF_iw, label="Analytical")
     plt.show()
 
 if __name__ == '__main__':

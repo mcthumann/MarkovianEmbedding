@@ -4,9 +4,11 @@ import scipy.interpolate
 import scipy.integrate
 import pandas as pd
 plt.ticklabel_format(style='sci', axis='x', scilimits=(0,0), useMathText=True)
+import numpy as np
+import scipy
 
 class Analytical_Solution:
-    def __init__(self, density, c, shear, bulk, a, particle_density, K, tau_f, m, M, gamma_s, k_b, T, VSP_length, integ_points, times):
+    def __init__(self, density, c, shear, bulk, a, particle_density, K, tau_f, m, M, gamma_s, T, VSP_length, integ_points, time_range=(-10, -5), time_points=60):
         self.density = density
         self.c = c
         self.shear = shear
@@ -18,11 +20,32 @@ class Analytical_Solution:
         self.m = m
         self.M = M
         self.gamma_s = gamma_s
-        self.k_b = k_b
+        self.k_b = scipy.constants.k
         self.T = T
         self.VSP_length = VSP_length
         self.integ_points = integ_points
-        self.times = times
+        self.time_range = time_range
+        self.time_points = time_points
+
+        # Automatically calculate frequencies based on times
+        self.times, self.frequencies = self.set_times_and_frequencies()
+
+    def set_times_and_frequencies(self):
+        # Generate time values logarithmically spaced
+        times = np.logspace(self.time_range[0], self.time_range[1], self.time_points)
+
+        # Maximum and minimum times determine the frequency range
+        t_min = np.min(times)
+        t_max = np.max(times)
+
+        # Maximum and minimum frequencies are the inverse of times
+        f_min = 1 / t_max
+        f_max = 1 / t_min
+
+        # Generate frequency values logarithmically spaced based on time-derived limits
+        frequencies = np.logspace(np.log10(f_min), np.log10(f_max), self.integ_points)
+
+        return times, frequencies
 
     def gamma(self, omega):
         alpha = np.sqrt(-1j * omega * self.tau_f)
@@ -56,20 +79,13 @@ class Analytical_Solution:
         G = (-1 * omega ** 2 * mass - 1j * omega * gamma + self.K) ** -1
         return np.abs(G) ** -2 * SPD
 
-
     def ACF_from_SPD(self, admit_function, SPD_func, times):
-        low_freq = np.linspace(1, 10 ** 4, self.integ_points)
-        mid_freq = np.linspace(10 ** 4, 10 ** 6, self.integ_points)
-        high_freq = np.linspace(10 ** 6, 10 ** 9, self.integ_points)
-        top_freq = np.linspace(10 ** 9, 10 ** 12, self.integ_points)
-
-        frequencies = np.concatenate((low_freq, mid_freq, high_freq, top_freq))
         ACF = np.zeros(len(times))
 
         for i in range(len(times)):
             ACF[i] = 2 * np.real(
-                scipy.integrate.simps(SPD_func(frequencies, admit_function) * np.exp(-1j * frequencies * times[i]),
-                                      frequencies)) / (2 * np.pi)
+                scipy.integrate.simps(SPD_func(self.frequencies, admit_function) * np.exp(-1j * self.frequencies * times[i]),
+                                      self.frequencies)) / (2 * np.pi)
         # Normalize the ACF by dividing by the maximum absolute value
         max_ACF = np.max(np.abs(ACF))
         if max_ACF != 0:  # Avoid division by zero
@@ -79,17 +95,10 @@ class Analytical_Solution:
 
 
     def ACF_from_admit(self, admit_func, times):
-        lowest = (10 ** -10, 1, self.integ_points * 2)
-        low_freq = np.linspace(1, 10 ** 4, self.integ_points)
-        mid_freq = np.linspace(10 ** 4, 10 ** 6, self.integ_points)
-        high_freq = np.linspace(10 ** 6, 10 ** 9, self.integ_points)
-        top_freq = np.linspace(10 ** 9, 10 ** 12, self.integ_points)
-
-        frequencies = np.concatenate((low_freq, mid_freq, high_freq, top_freq))
         ACF = np.zeros(len(times))
-        admit_guy = np.real(admit_func(frequencies)) / frequencies ** 2
+        admit_guy = np.real(admit_func(self.frequencies)) / self.frequencies ** 2
         for i in range(len(times)):
-            ACF[i] = scipy.integrate.simps(np.cos(frequencies * times[i]) * admit_guy, frequencies)
+            ACF[i] = scipy.integrate.simps(np.cos(self.frequencies * times[i]) * admit_guy, self.frequencies)
 
         return ACF
 
