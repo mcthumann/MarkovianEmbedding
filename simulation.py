@@ -32,7 +32,6 @@ class MarkovianEmbeddingProcess:
         self.v_i = v_i
         self.gamma_i = gamma_i
         self.delta = delta
-        self.timestep = timestep
 
         # Optional Params
         self.sample_rate = sample_rate
@@ -50,6 +49,7 @@ class MarkovianEmbeddingProcess:
             self.t_c = self.mass/self.gamma
             self.x_c = self.v_c*self.t_c
 
+        self.timestep = timestep
         # Single step variables
         self.curr_x = None
         self.curr_v = None
@@ -220,8 +220,6 @@ class MarkovianEmbeddingProcess:
         plt.show()
 
     def graph_VACF(self):
-        print("Mass is " + str(self.mass))
-        print("T_c is " + str(self.t_c))
         all_vacf_np = np.array(self.all_vacf)
         mean_vacf = np.mean(all_vacf_np, axis=0)
         plt.plot([t*(self.timestep*self.sample_rate)*self.t_c for t in range(np.size(mean_vacf))], mean_vacf, label="Simulation")

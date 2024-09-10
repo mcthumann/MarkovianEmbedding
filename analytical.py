@@ -86,11 +86,6 @@ class Analytical_Solution:
             ACF[i] = 2 * np.real(
                 scipy.integrate.simps(SPD_func(self.frequencies, admit_function) * np.exp(-1j * self.frequencies * times[i]),
                                       self.frequencies)) / (2 * np.pi)
-        # Normalize the ACF by dividing by the maximum absolute value
-        max_ACF = np.max(np.abs(ACF))
-        if max_ACF != 0:  # Avoid division by zero
-            ACF /= max_ACF
-
         return ACF
 
 
@@ -121,7 +116,10 @@ class Analytical_Solution:
 
 
     def mean_square_displacement(self, PACF):
-        return 2 * self.k_b * self.T / self.K - 2 * PACF
+        if self.K == 0:
+            return 2 * self.k_b * self.T / self.gamma_s - 2 * PACF
+        else:
+            return 2 * self.k_b * self.T / self.K - 2 * PACF
 
 
     def calculate(self):
@@ -144,8 +142,12 @@ class Analytical_Solution:
         MSD_compressible = self.mean_square_displacement(PACF_compressible)
         MSD_incompressible = self.mean_square_displacement(PACF_incompressible)
 
-        compress_correction = (self.k_b * self.T / self.K / PACF_compressible[0])
-        incompress_correction = (self.k_b * self.T / self.K / PACF_incompressible[0])
+        confinement = self.K
+        if self.K == 0:
+            confinement = self.gamma_s
+
+        compress_correction = (self.k_b * self.T / confinement / PACF_compressible[0])
+        incompress_correction = (self.k_b * self.T / confinement / PACF_incompressible[0])
 
         PACF_incompressible *= compress_correction
         PACF_compressible *= incompress_correction
