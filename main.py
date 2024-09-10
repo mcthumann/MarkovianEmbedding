@@ -1,5 +1,7 @@
 import math
 
+import matplotlib.pyplot as plt
+
 from simulation import *
 from analytical import *
 from gomez_analytical import *
@@ -13,16 +15,17 @@ def run():
     c = 1.78167 # a prefactor that depends on the particular choice of b
     v_0 = 1E3 # High cutoff frequency
     a = 1E-6 # Particle size
-    eta = 0.89E-3 # Viscosity of water
+    eta = 1E-3 # Viscosity of water
     rho_silica = 2200 # Density of silica
     rho_f = 1000 # Density of water
     mass = (4 / 3) * math.pi * (a / 2.0) ** 3 * rho_silica
     mass_total = mass + .5 * (4 / 3) * math.pi * (a/2.0)** 3 * rho_f # Mass plus added mass
     temp = 273
+    tao_fc = 1.5
 
-    lag_fraction = 0.1
-    sample_rate = 10
-    simulation_number = 10
+    lag_fraction = 1
+    sample_rate = 1
+    simulation_number = 1
 
     # ANALYTICAL PARAMETERS
     c_water = 1500
@@ -32,41 +35,69 @@ def run():
     VSP_length = 1000
     integ_points = 10 ** 4 * 8
     start = -10
-    stop = -7
+    stop = -5
     time_range = (start, stop)
     time_points = 60
 
     # HELPER PARAMETERS
-    tao_f = (rho_f * a**2)/eta # Characteristic time for vorticy diffusion across length of sphere
     gamma = 6*math.pi*a*eta # Steady-state friction coefficient of the particle
     tao_c = mass_total/gamma # Momentum relaxation time of the particle
+    tao_f = (rho_f * a ** 2) / (eta)  # Characteristic time for vorticy diffusion across length of sphere
     v_c = math.sqrt((const.k*temp)/mass_total)
     x_c = tao_c*v_c
     f_c = (const.k*temp)/x_c
-    timestep = 1E-4 # Simulation timestep
-    v_i = [v_0*b**(-i) for i in range(1, n+1)] # Decaying samples from an exponential distribution ...
-    gamma_i = [(x_c/f_c)*(0.5*gamma*c*math.sqrt(tao_f/math.pi)*(v_i[i]**(3.0/2.0))) for i in range(n)]
-    gamma_0 = 0.5*gamma*c*math.sqrt(tao_f/math.pi)*sum(math.sqrt(v*x_c) for v in v_i)
+    timestep = 1E-4# Simulation timestep
+    v_i = [tao_c*v_0/(b**(i)) for i in range(1, n+1)] # Decaying samples from an exponential distribution ...
+    print(v_i)
+    gamma_i = [(x_c/f_c/tao_c)*(0.5*gamma*c*math.sqrt(tao_fc/math.pi)*(v_i[i]**(3.0/2.0))) for i in range(n)]
+    gamma_0 = 0.5*gamma*c*math.sqrt(tao_fc/math.pi)*sum(math.sqrt(v) for v in v_i)
     delta = gamma_0/gamma
 
-    trace_length = int((10**stop)/(timestep*sample_rate*lag_fraction*tao_c))
+    trace_length = int((10**stop)/(timestep*tao_c))
 
     # Run the analytics
     sol = Analytical_Solution(rho_f, c_water, eta, bulk, a, rho_silica, K, tao_f, mass, mass_total, gamma, temp, VSP_length, integ_points, time_range=time_range, time_points=time_points)
     times, freq, VSPD_cw, VSPD_iw, PSD_iw, PSD_cw, VACF_cw, VACF_iw, PACF_cw, PACF_iw, TPSD_cw, TPSD_iw = sol.calculate()
 
     # Run the simulation
-    mep = MarkovianEmbeddingProcess(n, v_i, gamma_i, delta, timestep, sample_rate=sample_rate)
-    mep.run_numerical_simulation(simulation_number, trace_length, graph=False, msd=False)
+    mep = MarkovianEmbeddingProcess(n, v_i, gamma_i, delta, timestep, sample_rate, lag_fraction, temp=temp, mass=mass, gamma=gamma)
+    mep.run_numerical_simulation(simulation_number, trace_length, graph=True, msd=False)
 
     gom = GomezAnalytical(tao_c, tao_f, start, stop)
 
     # Graph
-    gom.graph()
-
+    #gom.graph()
+    VACF_iw/=VACF_iw[0]
     mep.graph_VACF()
+    plt.plot(times, VACF_iw, label="Analytical")
+    plt.legend()
+    plt.title("VACF")
+    plt.show()
 
-    plt.semilogx(times/tao_c, VACF_iw/v_c**2, label="Analytical")
+    # Graph
+    mep.graph_PACF()
+    PACF_iw /= PACF_iw[0]
+    plt.plot(times, PACF_iw, label="Analytical")
+    plt.xscale('log')
+    plt.yscale('log')
+    plt.legend()
+    plt.title("PACF")
+    plt.show()
+
+    # Graph
+    mep.graph_PSD()
+    plt.semilogx(freq, PSD_iw, label="Analytical")
+    plt.legend()
+    plt.title("PSD")
+    plt.show()
+
+    # plt.plot(times, VACF_cw / (k_b*T / (m)), label = "Compressible model")
+    plt.plot(times, VACF_iw / (const.k * temp / mass_total), label="Incompressible model")
+    plt.xlabel("Time [s]")
+    plt.ylabel("Normalized VACF [arb. units]")
+    plt.xscale("log")
+    #plt.xlim(10 ** -6, 10 ** -1)
+    plt.legend()
     plt.show()
 
 if __name__ == '__main__':

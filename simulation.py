@@ -26,7 +26,7 @@ class MarkovianEmbeddingProcess:
     """
     # First, we initialize x, v and u appropriately. Entries of u should be initialized by sampling randomly
     # from a gaussian distribution with mean 0 and variance gamma_i.
-    def __init__(self, n, v_i, gamma_i, delta, timestep, sample_rate=10, lag_fraction=0.1, temp=-1, mass=-1, gamma=-1):
+    def __init__(self, n, v_i, gamma_i, delta, timestep, sample_rate, lag_fraction, temp=-1, mass=-1, gamma=-1):
         # Parameters
         self.n = n # Number of auxliary stochastic variables
         self.v_i = v_i
@@ -64,13 +64,14 @@ class MarkovianEmbeddingProcess:
         self.all_pacf = []
         self.all_vacf = []
         self.all_msd = []
+        self.all_psd = []
 
     # reset_trace() should be called at the end of simulating a single time trace. It will
     # set the variables to initial conditions, add the time trace correlation function and
     # MSD to memory, and clear the last time trace from memory
     def reset_trace(self, trace_len):
         self.curr_x = 0
-        self.curr_v = np.random.normal(0, 1)
+        self.curr_v = 0
         self.curr_u = [np.random.normal(0, math.sqrt(var)) for var in self.gamma_i]
         # Allocate arrays and set first value
         self.all_x = np.zeros(trace_len)
@@ -90,6 +91,7 @@ class MarkovianEmbeddingProcess:
 
         for k in range(self.sample_rate):
             N_i = np.random.normal(0,1, self.n+1)
+            #print(N_i)
             N_0 = sum([math.sqrt(self.gamma_i[j]/(self.v_i[j]*self.delta))*N_i[j] for j in range(self.n)])
 
             next_u = [((1 - self.v_i[j]*self.timestep)*curr_u[j] - self.gamma_i[j]*self.timestep*curr_v +
@@ -109,7 +111,7 @@ class MarkovianEmbeddingProcess:
         self.curr_v = curr_v
         self.curr_u = curr_u
 
-    def run_numerical_simulation(self, sim_num, trace_len, pacf=True, vacf=True, msd=True, graph=False):
+    def run_numerical_simulation(self, sim_num, trace_len, pacf=True, vacf=True, msd=True, psd=True, graph=False):
         print("Will Simulate " + str(trace_len * self.sample_rate) + " points, sampling every " + str(self.sample_rate)
               + " for a duration of " + str(trace_len * self.sample_rate * self.timestep) + " time constants")
 
@@ -130,15 +132,10 @@ class MarkovianEmbeddingProcess:
             if msd:
                 print("Computing MSD")
                 self.compute_MSD()
+            if psd:
+                print("Computing MSD")
+                self.compute_PSD()
             self.reset_trace(trace_len)
-        if graph:
-            plt.show()
-            if pacf:
-                self.graph_PACF()
-            if vacf:
-                self.graph_VACF()
-            if msd:
-                self.graph_MSD()
 
 
     # Function to graph all x positions
@@ -169,7 +166,6 @@ class MarkovianEmbeddingProcess:
 
         # Normalize ACF so that ACF(0) = 1
         acf /= acf[0]
-
         # Append the computed PACF for this trace
         self.all_pacf.append(acf)
 
@@ -211,13 +207,44 @@ class MarkovianEmbeddingProcess:
         # Append the computed MSD for this trace
         self.all_msd.append(msd)
 
+    def compute_PSD(self, transient=0.0):
+        # Extract the velocity trace, excluding the transient portion if necessary
+        trace = np.array(self.all_v[int(transient * len(self.all_v)):])
+        # Normalize the velocity by the characteristic velocity
+        trace /= self.v_c
+        # Compute the Fourier transform of the velocity data
+        fft_result = fft(trace)
+        # Compute the Power Spectral Density (PSD)
+        psd = np.abs(fft_result) ** 2 / len(trace)
+        # Generate the corresponding frequencies
+        freqs = np.fft.fftfreq(len(trace), d=self.timestep)
+        # Take only the positive frequencies and PSD values
+        positive_freqs = freqs[:len(freqs) // 2]
+        psd = psd[:len(psd) // 2]
+        # Store or return the computed PSD
+        self.all_psd.append((positive_freqs, psd))
+
+    def graph_PSD(self):
+        # Unpack and average the PSDs over all stored tuples
+        all_psd_np = np.array([psd for _, psd in self.all_psd])
+        mean_psd = np.mean(all_psd_np, axis=0)
+        mean_psd=mean_psd*(self.x_c**2)*self.t_c
+        # Frequencies should be the same for all PSDs, so just take the first one
+        positive_freqs = np.array(self.all_psd[0][0])/self.t_c
+
+        # Plot the mean PSD
+        plt.plot(positive_freqs, mean_psd, label="Simulation")
+        plt.xscale('log')
+        plt.yscale('log')
+        plt.xlabel('Frequency [Hz]')
+        plt.ylabel('PSD')
+
     def graph_PACF(self):
         all_pacf_np = np.array(self.all_pacf)
         mean_pacf = np.mean(all_pacf_np, axis = 0)
-        plt.plot([t*(self.timestep*self.sample_rate)*self.t_c for t in range(np.size(mean_pacf))], mean_pacf)
+        plt.plot([t*(self.timestep*self.sample_rate)*self.t_c for t in range(np.size(mean_pacf))], mean_pacf, label="Simulation")
         plt.xscale('log')
         plt.yscale('log')
-        plt.show()
 
     def graph_VACF(self):
         all_vacf_np = np.array(self.all_vacf)
@@ -225,14 +252,12 @@ class MarkovianEmbeddingProcess:
         plt.plot([t*(self.timestep*self.sample_rate)*self.t_c for t in range(np.size(mean_vacf))], mean_vacf, label="Simulation")
         plt.xscale('log')
 
-
     def graph_MSD(self):
         all_msd_np = np.array(self.all_msd)
         mean_msd = np.mean(all_msd_np, axis = 0)
-        plt.plot([t*(self.timestep*self.sample_rate)*self.t_c for t in range(np.size(mean_msd))], mean_msd/self.x_c**2)
+        plt.plot([t*(self.timestep*self.sample_rate)*self.t_c for t in range(np.size(mean_msd))], mean_msd/self.x_c**2, label="Simulation")
         plt.xscale('log')
         plt.yscale('log')
-        plt.show()
 
 # TODO add a trapping term/restoring force?
 # TODO graph the analytical functions
