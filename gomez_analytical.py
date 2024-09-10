@@ -45,11 +45,8 @@ class GomezAnalytical:
         return a_plus, a_minus
 
     def graph(self):
-        print(self.tau_c)
         tau_start = np.power(10, self.start) / self.tau_c
-        print(tau_start)
         tau_stop = np.power(10, self.stop) / self.tau_c
-        print(tau_start)
         tau = np.logspace(np.log10(tau_start), np.log10(tau_stop), 100)
 
         # Calculate a_+ and a_-
