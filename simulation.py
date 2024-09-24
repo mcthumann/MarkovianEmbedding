@@ -114,7 +114,7 @@ class MarkovianEmbeddingProcess:
     def run_numerical_simulation(self, sim_num, trace_len, pacf=True, vacf=True, msd=True, psd=True, graph=False):
         print("Will Simulate " + str(trace_len * self.sample_rate) + " points, sampling every " + str(self.sample_rate)
               + " for a duration of " + str(trace_len * self.sample_rate * self.timestep) + " time constants")
-
+        print("trace_len size" + str(trace_len))
         self.reset_trace(trace_len)
         for i in range(sim_num):
             for j in range(trace_len):
@@ -183,8 +183,6 @@ class MarkovianEmbeddingProcess:
         # Normalize by the number of terms contributing to each lag
         acf /= np.arange(N, N - max_lag, -1)
 
-        # Normalize ACF so that ACF(0) = 1
-        acf /= acf[0]
         self.all_vacf.append(acf)
 
     def compute_MSD(self, skip_lags=1, transient=0.0):
@@ -246,11 +244,15 @@ class MarkovianEmbeddingProcess:
         plt.xscale('log')
         plt.yscale('log')
 
-    def graph_VACF(self):
+    def graph_VACF(self, start, stop):
         all_vacf_np = np.array(self.all_vacf)
         mean_vacf = np.mean(all_vacf_np, axis=0)
+        mean_vacf *= self.v_c**2
+        mean_vacf/= (const.k * self.temp / self.mass)
+        print("mean vacf size " + str(np.size(mean_vacf)))
+        print("last x " + str(np.size(mean_vacf)*self.t_c))
         plt.plot([t*(self.timestep*self.sample_rate)*self.t_c for t in range(np.size(mean_vacf))], mean_vacf, label="Simulation")
-        plt.xscale('log')
+        plt.xlim(start, stop)
 
     def graph_MSD(self):
         all_msd_np = np.array(self.all_msd)

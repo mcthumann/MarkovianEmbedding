@@ -57,4 +57,4 @@ class GomezAnalytical:
 
         # Plotting the results
         plt.figure()
-        plt.plot(tau, psi_values)
+        plt.plot(tau, psi_values, label="Gomez Solution")
