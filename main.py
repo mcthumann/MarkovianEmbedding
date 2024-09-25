@@ -35,7 +35,7 @@ def run():
     VSP_length = 1000
     integ_points = 10 ** 4 * 8
     start = -10
-    stop = -6
+    stop = -7
     time_range = (start, stop)
     time_points = 60
 
@@ -64,7 +64,7 @@ def run():
 
     # Run the simulation
     mep = MarkovianEmbeddingProcess(n, v_i, gamma_i, delta, timestep, sample_rate, lag_fraction, temp=temp, mass=mass_total, gamma=gamma)
-    mep.run_numerical_simulation(simulation_number, trace_length, graph=True, msd=False)
+    mep.run_numerical_simulation(simulation_number, trace_length, graph=True, msd=True)
 
     gom = GomezAnalytical(tao_c, tao_f, start, stop)
 
@@ -92,6 +92,26 @@ def run():
     plt.legend()
     plt.xlim(1/10**stop, 1/10**start)
     plt.title("PSD")
+    plt.show()
+
+    # Graph
+    mep.graph_MSD()
+    plt.title("MSD")
+    plt.show()
+
+    # Find spots where velocity is zero
+    index_mult = (timestep * sample_rate) * tao_c
+    plt.plot([t * index_mult for t in range(len(mep.all_x))], mep.all_x * x_c, linewidth=0.5)
+
+    tolerance = .001
+    close_to_zero_indices = np.where(abs(mep.all_v) < tolerance)[0]
+    print("len is " + str(len(close_to_zero_indices)))
+    print(close_to_zero_indices)
+
+    plt.title("Positions")
+    # Draw vertical lines where values are close to zero
+    for index in close_to_zero_indices:
+        plt.axvline(x=index*index_mult, color='red', linestyle='-', linewidth=0.1)
     plt.show()
 
 if __name__ == '__main__':

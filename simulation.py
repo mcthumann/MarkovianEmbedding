@@ -121,7 +121,7 @@ class MarkovianEmbeddingProcess:
                     print("#", end="-")
                 self.compute_next_state(j)
             if graph:
-                self.graph_x()
+                self.graph_v()
             if pacf:
                 print("Computing PACF")
                 self.compute_PACF()
@@ -134,7 +134,8 @@ class MarkovianEmbeddingProcess:
             if psd:
                 print("Computing MSD")
                 self.compute_PSD()
-            self.reset_trace(trace_len)
+            if i < sim_num - 1:
+                self.reset_trace(trace_len)
         if graph:
             plt.show()
 
