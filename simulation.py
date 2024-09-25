@@ -91,7 +91,6 @@ class MarkovianEmbeddingProcess:
 
         for k in range(self.sample_rate):
             N_i = np.random.normal(0,1, self.n+1)
-            #print(N_i)
             N_0 = sum([math.sqrt(self.gamma_i[j]/(self.v_i[j]*self.delta))*N_i[j] for j in range(self.n)])
 
             next_u = [((1 - self.v_i[j]*self.timestep)*curr_u[j] - self.gamma_i[j]*self.timestep*curr_v +
@@ -136,7 +135,8 @@ class MarkovianEmbeddingProcess:
                 print("Computing MSD")
                 self.compute_PSD()
             self.reset_trace(trace_len)
-
+        if graph:
+            plt.show()
 
     # Function to graph all x positions
     def graph_x(self):
@@ -208,8 +208,6 @@ class MarkovianEmbeddingProcess:
     def compute_PSD(self, transient=0.0):
         # Extract the velocity trace, excluding the transient portion if necessary
         trace = np.array(self.all_v[int(transient * len(self.all_v)):])
-        # Normalize the velocity by the characteristic velocity
-        trace /= self.v_c
         # Compute the Fourier transform of the velocity data
         fft_result = fft(trace)
         # Compute the Power Spectral Density (PSD)
@@ -226,7 +224,7 @@ class MarkovianEmbeddingProcess:
         # Unpack and average the PSDs over all stored tuples
         all_psd_np = np.array([psd for _, psd in self.all_psd])
         mean_psd = np.mean(all_psd_np, axis=0)
-        mean_psd=mean_psd*(self.x_c**2)*self.t_c
+        mean_psd=mean_psd*((self.v_c**2)*self.t_c)
         # Frequencies should be the same for all PSDs, so just take the first one
         positive_freqs = np.array(self.all_psd[0][0])/self.t_c
 
@@ -241,14 +239,10 @@ class MarkovianEmbeddingProcess:
         all_pacf_np = np.array(self.all_pacf)
         mean_pacf = np.mean(all_pacf_np, axis = 0)
         plt.plot([t*(self.timestep*self.sample_rate)*self.t_c for t in range(np.size(mean_pacf))], mean_pacf, label="Simulation")
-        plt.xscale('log')
-        plt.yscale('log')
 
     def graph_VACF(self, start, stop):
         all_vacf_np = np.array(self.all_vacf)
         mean_vacf = np.mean(all_vacf_np, axis=0)
-        mean_vacf *= self.v_c**2
-        mean_vacf/= (const.k * self.temp / self.mass)
         print("mean vacf size " + str(np.size(mean_vacf)))
         print("last x " + str(np.size(mean_vacf)*self.t_c))
         plt.plot([t*(self.timestep*self.sample_rate)*self.t_c for t in range(np.size(mean_vacf))], mean_vacf, label="Simulation")
@@ -261,6 +255,4 @@ class MarkovianEmbeddingProcess:
         plt.xscale('log')
         plt.yscale('log')
 
-# TODO add a trapping term/restoring force?
-# TODO graph the analytical functions
 # TODO Look for superdiffusion!
