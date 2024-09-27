@@ -257,3 +257,122 @@ class MarkovianEmbeddingProcess:
         plt.yscale('log')
 
 # TODO Look for superdiffusion!
+
+class SuperDiffusiveSimulation(MarkovianEmbeddingProcess):
+    def __init__(self, n, v_i, gamma_i, delta, timestep, sample_rate, lag_fraction, velocity_tolerance, temp=-1, mass=-1, gamma=-1):
+        # Call the parent class's constructor
+        super().__init__(n, v_i, gamma_i, delta, timestep, sample_rate, lag_fraction, temp=-1, mass=-1, gamma=-1)
+        self.all_x_list = None
+        self.all_v_list = None
+        self.zero_indicies = None
+        self.vel_tolerance = velocity_tolerance
+
+    def save_trace(self, i):
+        self.all_x_list[i] = (self.all_x)
+        self.all_v_list[i] = (self.all_v)
+
+    def reset_trace_sd(self, trace_len):
+        self.curr_x = 0
+        self.curr_v = 0
+        self.curr_u = [np.random.normal(0, math.sqrt(var)) for var in self.gamma_i]
+        # Allocate arrays and set first value
+        self.all_x = np.zeros(trace_len)
+        self.all_x[0] = self.curr_x
+        self.all_v = np.zeros(trace_len)
+        self.all_v[0] = self.curr_v
+        self.all_u = np.empty(trace_len, dtype=object)
+        self.all_u[0] = self.curr_u
+
+    def run_sim_find_super_diff(self, sim_num, trace_len):
+        self.all_x_list = np.zeros((sim_num, trace_len))
+        self.all_v_list = np.zeros((sim_num, trace_len))
+        self.reset_trace_sd(trace_len)
+        for i in range(sim_num):
+            for j in range(trace_len):
+                if j % (int(trace_len / 100)) == 0:
+                    print("#", end="-")
+                self.compute_next_state(j)
+            print()
+            self.save_trace(i)
+            if i < sim_num - 1:
+                self.reset_trace_sd(trace_len)
+
+        # Note, we are assuming the msd we want will be 10% of the total trace len
+        # We have thrown out indicies in the first and last 10%
+
+        # now find where its zero
+        close_to_zero_indices = []
+        for i in range(sim_num):
+            close_to_zero_indices.append(np.where(abs(self.all_v_list[i,:]) < self.vel_tolerance)[0])
+
+        self.zero_indicies = [row[(row > int(trace_len*0.1)) & (row < int(trace_len*0.9))] for row in close_to_zero_indices]
+
+        # find some random indicies (use same amount as close to zero indicies)
+        random_indicies = []
+        for i in range(sim_num):
+            random_indicies.append(np.random.randint(int(trace_len*0.1), int(trace_len*0.9), size=len(self.zero_indicies[i])))
+
+        rand_msd = []
+        # calculate msd for everything, for the random sample, and for the zero velocity sample
+        for i in range(len(random_indicies)):
+            for idx in random_indicies[i]:
+                rand_msd.append(self.get_msd_from_idx(i, idx, int(trace_len*0.01)))
+
+        zero_msd = []
+        for i in range(len(self.zero_indicies)):
+            for idx in self.zero_indicies[i]:
+                zero_msd.append(self.get_msd_from_idx(i, idx, int(trace_len*0.01)))
+
+        # Graph the two msd's
+        print("averaged " + str(len(zero_msd)) + " msds")
+        zero_msd_np = np.array(zero_msd)
+        mean_msd = np.mean(zero_msd_np, axis=0)
+        plt.plot([t for t in range(np.size(mean_msd))],
+                 mean_msd / self.x_c ** 2, label="Super Diffusive MSD")
+
+        rand_msd_np = np.array(rand_msd)
+        mean_msd = np.mean(rand_msd_np, axis=0)
+        plt.plot([t for t in range(np.size(mean_msd))],
+                 mean_msd / self.x_c ** 2, label="Regular MSD")
+        plt.xscale('log')
+        plt.yscale('log')
+        plt.legend()
+        plt.show()
+
+        self.graph_all_traces()
+
+    def get_msd_from_idx(self, trace_idx, trace_pos_start, siz):
+        # Extract the relevant portion of the trace
+        trace = self.all_x_list[trace_idx, trace_pos_start:trace_pos_start + siz]
+
+        # Initialize MSD array
+        msd = np.zeros(len(trace))
+
+        # Compute MSD for each lag delta_t
+        for delta_t in range(1, len(trace)):
+            # Displacement relative to the first point (trace[0])
+            displacements = trace[delta_t:] - trace[0]
+            # Mean squared displacement
+            msd[delta_t] = np.mean(displacements ** 2)
+
+        # Return the computed MSD for this trace
+        return msd
+
+    def graph_all_traces(self):
+
+        colors = plt.rcParams['axes.prop_cycle'].by_key()['color'][:len(self.all_x_list)]
+        for i in range(len(self.all_x_list)):
+            """* (self.timestep * self.sample_rate) * self.t_c"""
+            plt.plot([t for t in range(len(self.all_x_list[i]))],
+                     self.all_x_list[i] * self.x_c, color=colors[i], linewidth=0.5)
+            # Draw vertical lines where values are close to zero
+            for index in self.zero_indicies[i]:
+                plt.axvline(x=index, color=colors[i], linestyle='-', linewidth=1)
+        plt.show()
+        for i in range(len(self.all_v_list)):
+            plt.plot([t for t in range(len(self.all_v_list[i]))],
+                     self.all_v_list[i] * self.v_c, color=colors[i], linewidth=0.3)
+            # Draw vertical lines where values are close to zero
+            for index in self.zero_indicies[i]:
+                plt.axvline(x=index, color=colors[i], linestyle='-', linewidth=1)
+        plt.show()
