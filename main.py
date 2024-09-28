@@ -25,7 +25,7 @@ def run():
 
     lag_fraction = 1
     sample_rate = 1
-    simulation_number = 5
+    simulation_number = 10
 
     # ANALYTICAL PARAMETERS
     c_water = 1500
@@ -38,7 +38,6 @@ def run():
     stop = -5
     time_range = (start, stop)
     time_points = 60
-
 
     # HELPER PARAMETERS
     timestep = 1E-4  # Simulation timestep
@@ -115,10 +114,10 @@ def run():
     # plt.show()
     #
 
-    velocity_tolerance = .0005
+    velocity_tolerance = .001
 
     # Super Diffusive
-    sd = SuperDiffusiveSimulation(n, v_i, gamma_i, delta, timestep, sample_rate, lag_fraction, velocity_tolerance, temp, mass=mass_total, gamma=gamma)
+    sd = SuperDiffusiveSimulation(n, v_i, gamma_i, delta, timestep, sample_rate, lag_fraction, velocity_tolerance, temp=temp, mass=mass_total, gamma=gamma)
     sd.run_sim_find_super_diff(simulation_number, trace_length)
 
 

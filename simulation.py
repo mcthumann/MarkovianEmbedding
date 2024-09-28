@@ -261,7 +261,7 @@ class MarkovianEmbeddingProcess:
 class SuperDiffusiveSimulation(MarkovianEmbeddingProcess):
     def __init__(self, n, v_i, gamma_i, delta, timestep, sample_rate, lag_fraction, velocity_tolerance, temp=-1, mass=-1, gamma=-1):
         # Call the parent class's constructor
-        super().__init__(n, v_i, gamma_i, delta, timestep, sample_rate, lag_fraction, temp=-1, mass=-1, gamma=-1)
+        super().__init__(n, v_i, gamma_i, delta, timestep, sample_rate, lag_fraction, temp=temp, mass=mass, gamma=gamma)
         self.all_x_list = None
         self.all_v_list = None
         self.zero_indicies = None
@@ -306,6 +306,7 @@ class SuperDiffusiveSimulation(MarkovianEmbeddingProcess):
             close_to_zero_indices.append(np.where(abs(self.all_v_list[i,:]) < self.vel_tolerance)[0])
 
         self.zero_indicies = [row[(row > int(trace_len*0.1)) & (row < int(trace_len*0.9))] for row in close_to_zero_indices]
+        self.zero_indicies = filter_indicies(self.zero_indicies, trace_len*0.1)
 
         # find some random indicies (use same amount as close to zero indicies)
         random_indicies = []
@@ -327,13 +328,25 @@ class SuperDiffusiveSimulation(MarkovianEmbeddingProcess):
         print("averaged " + str(len(zero_msd)) + " msds")
         zero_msd_np = np.array(zero_msd)
         mean_msd = np.mean(zero_msd_np, axis=0)
-        plt.plot([t for t in range(np.size(mean_msd))],
-                 mean_msd / self.x_c ** 2, label="Super Diffusive MSD")
+        plt.plot([t*(self.timestep*self.sample_rate)*self.t_c for t in range(np.size(mean_msd))],
+                 mean_msd / self.x_c ** 2, label="Super Diffusive MSD Simulation")
 
         rand_msd_np = np.array(rand_msd)
         mean_msd = np.mean(rand_msd_np, axis=0)
-        plt.plot([t for t in range(np.size(mean_msd))],
-                 mean_msd / self.x_c ** 2, label="Regular MSD")
+        plt.plot([t*(self.timestep*self.sample_rate)*self.t_c for t in range(np.size(mean_msd))],
+                 mean_msd / self.x_c ** 2, label="Regular MSD Simulation")
+
+        # Graph the first three time constants as reference
+        plt.axvline(x=self.t_c, linestyle='-', linewidth=1)
+        plt.axvline(x=self.t_c*2, linestyle='-', linewidth=1)
+        plt.axvline(x=self.t_c*3, linestyle='-', linewidth=1)
+
+        # Graph t^3
+        plt.plot([t * (self.timestep * self.sample_rate) * self.t_c for t in range(np.size(mean_msd))],
+                 [((10e13 * 2/3 * t * (self.timestep * self.sample_rate) * self.t_c)**3) for t in range(np.size(mean_msd))] , label="t^3")
+        plt.plot([t * (self.timestep * self.sample_rate) * self.t_c for t in range(np.size(mean_msd))],
+                 [((10e16 * 2/3 * t * (self.timestep * self.sample_rate) * self.t_c) ** 2) for t in range(np.size(mean_msd))], label="t^2")
+
         plt.xscale('log')
         plt.yscale('log')
         plt.legend()
@@ -351,28 +364,47 @@ class SuperDiffusiveSimulation(MarkovianEmbeddingProcess):
         # Compute MSD for each lag delta_t
         for delta_t in range(1, len(trace)):
             # Displacement relative to the first point (trace[0])
-            displacements = trace[delta_t:] - trace[0]
+            displacement = trace[delta_t] - trace[0]
             # Mean squared displacement
-            msd[delta_t] = np.mean(displacements ** 2)
+            msd[delta_t] = np.mean(displacement ** 2)
 
         # Return the computed MSD for this trace
         return msd
 
     def graph_all_traces(self):
-
-        colors = plt.rcParams['axes.prop_cycle'].by_key()['color'][:len(self.all_x_list)]
         for i in range(len(self.all_x_list)):
             """* (self.timestep * self.sample_rate) * self.t_c"""
             plt.plot([t for t in range(len(self.all_x_list[i]))],
-                     self.all_x_list[i] * self.x_c, color=colors[i], linewidth=0.5)
+                     self.all_x_list[i] * self.x_c, linewidth=0.5)
             # Draw vertical lines where values are close to zero
             for index in self.zero_indicies[i]:
-                plt.axvline(x=index, color=colors[i], linestyle='-', linewidth=1)
+                plt.axvline(x=index, linestyle='-', linewidth=1)
         plt.show()
         for i in range(len(self.all_v_list)):
             plt.plot([t for t in range(len(self.all_v_list[i]))],
-                     self.all_v_list[i] * self.v_c, color=colors[i], linewidth=0.3)
+                     self.all_v_list[i] * self.v_c, linewidth=0.3)
             # Draw vertical lines where values are close to zero
             for index in self.zero_indicies[i]:
-                plt.axvline(x=index, color=colors[i], linestyle='-', linewidth=1)
+                plt.axvline(x=index, linestyle='-', linewidth=1)
         plt.show()
+
+def filter_indicies(arr2D, buffer):
+# Create an empty list to store the filtered results
+    filtered_zero_indicies = []
+    for row in arr2D:
+        # Create a new list to store filtered indices for the current row
+        filtered_row = []
+
+        # Iterate through indices in the row, while checking distance to the previous kept index
+        for idx in range(len(row)):
+            if idx == 0:
+                # Always keep the first element
+                filtered_row.append(row[idx])
+            else:
+                # Only add this index if it's sufficiently far from the last kept index
+                if row[idx] - row[idx - 1] >= buffer:
+                    filtered_row.append(row[idx])
+
+        # Append the filtered row to the list
+        filtered_zero_indicies.append(np.array(filtered_row))
+    return filtered_zero_indicies
