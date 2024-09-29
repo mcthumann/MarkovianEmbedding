@@ -35,7 +35,7 @@ def run():
     VSP_length = 1000
     integ_points = 10 ** 4 * 8
     start = -10
-    stop = -5
+    stop = -7
     time_range = (start, stop)
     time_points = 60
 

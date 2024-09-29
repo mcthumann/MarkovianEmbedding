@@ -329,12 +329,12 @@ class SuperDiffusiveSimulation(MarkovianEmbeddingProcess):
         zero_msd_np = np.array(zero_msd)
         mean_msd = np.mean(zero_msd_np, axis=0)
         plt.plot([t*(self.timestep*self.sample_rate)*self.t_c for t in range(np.size(mean_msd))],
-                 mean_msd / self.x_c ** 2, label="Super Diffusive MSD Simulation")
+                 mean_msd * self.x_c ** 2, label="Super Diffusive MSD Simulation")
 
         rand_msd_np = np.array(rand_msd)
         mean_msd = np.mean(rand_msd_np, axis=0)
         plt.plot([t*(self.timestep*self.sample_rate)*self.t_c for t in range(np.size(mean_msd))],
-                 mean_msd / self.x_c ** 2, label="Regular MSD Simulation")
+                 mean_msd * self.x_c ** 2, label="Regular MSD Simulation")
 
         # Graph the first three time constants as reference
         plt.axvline(x=self.t_c, linestyle='-', linewidth=1)
@@ -401,6 +401,7 @@ def filter_indicies(arr2D, buffer):
                 # Always keep the first element
                 filtered_row.append(row[idx])
             else:
+                print("diff is " + str(row[idx] - row[idx - 1]) + " buffer is " + str(buffer))
                 # Only add this index if it's sufficiently far from the last kept index
                 if row[idx] - row[idx - 1] >= buffer:
                     filtered_row.append(row[idx])
