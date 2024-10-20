@@ -15,6 +15,7 @@ import numpy as np
 from numpy.fft import fft, ifft
 import matplotlib.pyplot as plt
 import scipy.constants as const
+import pandas as pd
 plt.ticklabel_format(style='sci', axis='x', scilimits=(0,0), useMathText=True)
 
 class MarkovianEmbeddingProcess:
@@ -44,7 +45,6 @@ class MarkovianEmbeddingProcess:
         self.x_c = 1
         self.v_c = 1
         if self.temp > 0 and self.mass > 0 and self.gamma > 0:
-            print("Dimensionful quantities")
             self.v_c = math.sqrt((const.k*self.temp)/self.mass)
             self.t_c = self.mass/self.gamma
             self.x_c = self.v_c*self.t_c
@@ -110,12 +110,15 @@ class MarkovianEmbeddingProcess:
         self.curr_v = curr_v
         self.curr_u = curr_u
 
-    def run_numerical_simulation(self, sim_num, trace_len, pacf=True, vacf=True, msd=True, psd=True, graph=False):
+    def run_numerical_simulation(self, sim_num, trace_len, pacf=False, vacf=False, msd=False, psd=False, graph=False, save=True):
         print("Will Simulate " + str(trace_len * self.sample_rate) + " points, sampling every " + str(self.sample_rate)
               + " for a duration of " + str(trace_len * self.sample_rate * self.timestep) + " time constants")
-        print("trace_len size" + str(trace_len))
+
         self.reset_trace(trace_len)
+        if save:
+            df = pd.DataFrame()
         for i in range(sim_num):
+            print("Trace " + str(i) + ": ")
             for j in range(trace_len):
                 if j%(int(trace_len/100))==0:
                     print("#", end="-")
@@ -134,8 +137,24 @@ class MarkovianEmbeddingProcess:
             if psd:
                 print("Computing MSD")
                 self.compute_PSD()
+
+            # save off data
+            if save:
+                # Create a temporary DataFrame for this trace
+                temp_df = pd.DataFrame({'Position ' + str(i): self.all_x, 'Velocity ' + str(i): self.all_v})
+
+                if df.empty:
+                    # If the main DataFrame is empty, just set it equal to the temp_df
+                    df = temp_df
+                else:
+                    # Concatenate the new columns with the existing DataFrame
+                    df = pd.concat([df.reset_index(drop=True), temp_df.reset_index(drop=True)], axis=1)
+
             if i < sim_num - 1:
+                if save:
+                    df.to_csv('position_velocity_data.csv', index=False, mode='w')
                 self.reset_trace(trace_len)
+            print("")
         if graph:
             plt.show()
 
@@ -244,8 +263,6 @@ class MarkovianEmbeddingProcess:
     def graph_VACF(self, start, stop):
         all_vacf_np = np.array(self.all_vacf)
         mean_vacf = np.mean(all_vacf_np, axis=0)
-        print("mean vacf size " + str(np.size(mean_vacf)))
-        print("last x " + str(np.size(mean_vacf)*self.t_c))
         plt.plot([t*(self.timestep*self.sample_rate)*self.t_c for t in range(np.size(mean_vacf))], mean_vacf, label="Simulation")
         plt.xlim(start, stop)
 

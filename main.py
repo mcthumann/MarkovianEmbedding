@@ -6,6 +6,11 @@ from simulation import *
 from analytical import *
 from gomez_analytical import *
 
+# "100 independent trajectories starting from the abovementioned initial conditions are simulated with a
+# time-step ∆t = 10−4 τc, a total duration of 103 τc and then sampled at a frequency 103τ−1c thus amounting
+# to 10^8 data points over which all the average quantities characterizing the dynamics of the system
+# are computed"
+
 def run():
     # SIMULATION PARAMETERS
     n = 13 # Number of auxliary stochastic variables
@@ -25,7 +30,7 @@ def run():
 
     lag_fraction = 1
     sample_rate = 1
-    simulation_number = 5
+    simulation_number = 5#100
 
     # ANALYTICAL PARAMETERS
     c_water = 1500
@@ -47,7 +52,6 @@ def run():
     #tao_f = (rho_f * (a ** 2)) / (eta)  # Characteristic time for vorticy diffusion across length of sphere
     tao_f = (9*tao_c/(2*(rho_silica/rho_f)*+1))
     tao_fc = tao_f/tao_c
-    print("t_c " + str(tao_c) + " t_f " + str(tao_f) + " t_fc " + str(tao_f/tao_c))
     v_c = math.sqrt((const.k*temp)/mass_total)
     x_c = tao_c*v_c
     f_c = (const.k*temp)/x_c
@@ -62,42 +66,49 @@ def run():
     sol = Analytical_Solution(rho_f, c_water, eta, bulk, a, rho_silica, K, tao_f, mass, mass_total, gamma, temp, VSP_length, integ_points, time_range=time_range, time_points=time_points)
     times, freq, VPSD_cw, VPSD_iw, PSD_iw, PSD_cw, VACF_cw, VACF_iw, PACF_cw, PACF_iw, TPSD_cw, TPSD_iw = sol.calculate()
 
+    pacf = False
+    vacf = False
+    msd = False
+    psd = False
+    save = True
+
     # Run the simulation
     mep = MarkovianEmbeddingProcess(n, v_i, gamma_i, delta, timestep, sample_rate, lag_fraction, temp=temp, mass=mass_total, gamma=gamma)
-    mep.run_numerical_simulation(simulation_number, trace_length, graph=True, msd=True)
+    mep.run_numerical_simulation(simulation_number, trace_length, pacf, vacf, msd, psd, graph=False, save=save)
 
     gom = GomezAnalytical(tao_c, tao_f, start, stop)
 
     # Graph
-    #gom.graph()
-    VACF_iw/= (const.k * temp / mass_total)
-    mep.graph_VACF(10**start, 10**stop)
-    plt.plot(times, VACF_iw, label="Analytical")
-    plt.legend()
-    plt.title("VACF")
-    plt.xscale("log")
-    plt.show()
+    if vacf:
+        #gom.graph()
+        VACF_iw/= (const.k * temp / mass_total)
+        mep.graph_VACF(10**start, 10**stop)
+        plt.plot(times, VACF_iw, label="Analytical")
+        plt.legend()
+        plt.title("VACF")
+        plt.xscale("log")
+        plt.show()
 
-    # Graph
-    mep.graph_PACF()
-    PACF_iw /= PACF_iw[0]
-    plt.plot(times, PACF_iw, label="Analytical")
-    plt.legend()
-    plt.title("PACF")
-    plt.show()
+    if pacf:
+        mep.graph_PACF()
+        PACF_iw /= PACF_iw[0]
+        plt.plot(times, PACF_iw, label="Analytical")
+        plt.legend()
+        plt.title("PACF")
+        plt.show()
 
-    # Graph
-    mep.graph_PSD()
-    plt.semilogx(freq, VPSD_iw, label="Analytical")
-    plt.legend()
-    plt.xlim(1/10**stop, 1/10**start)
-    plt.title("PSD")
-    plt.show()
+    if psd:
+        mep.graph_PSD()
+        plt.semilogx(freq, VPSD_iw, label="Analytical")
+        plt.legend()
+        plt.xlim(1/10**stop, 1/10**start)
+        plt.title("PSD")
+        plt.show()
 
-    # Graph
-    mep.graph_MSD()
-    plt.title("MSD")
-    plt.show()
+    if msd:
+        mep.graph_MSD()
+        plt.title("MSD")
+        plt.show()
 
     # Find spots where velocity is zero
     index_mult = (timestep * sample_rate) * tao_c
@@ -105,8 +116,6 @@ def run():
 
     tolerance = .001
     close_to_zero_indices = np.where(abs(mep.all_v) < tolerance)[0]
-    print("len is " + str(len(close_to_zero_indices)))
-    print(close_to_zero_indices)
 
     plt.title("Positions")
     # Draw vertical lines where values are close to zero
