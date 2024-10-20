@@ -12,7 +12,7 @@ def run():
     b = 5 # Scaling dilation parameter that determines the low cutoff frequency ν_0*b^-n
     c = 1.78167 # a prefactor that depends on the particular choice of b
     v_0 = 1e3 # High cutoff frequency (already scaled by tao_c)
-    a = np.array([1e-6]) # Particle size
+    a = 1e-6 # Particle size
     eta = 1e-3 # Viscosity of water
     rho_silica = 2200 # Density of silica
     rho_f = 1000 # Density of water

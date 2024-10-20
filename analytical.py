@@ -84,8 +84,8 @@ class Analytical_Solution:
 
         for i in range(len(times)):
             ACF[i] = 2 * np.real(
-                scipy.integrate.simps(SPD_func(self.frequencies, admit_function) * np.exp(-1j * self.frequencies * times[i]),
-                                      self.frequencies)) / (2 * np.pi)
+                scipy.integrate.simpson(SPD_func(self.frequencies, admit_function) * np.exp(-1j * self.frequencies * times[i]),
+                                      x=self.frequencies)) / (2 * np.pi)
         return ACF
 
 
@@ -93,7 +93,7 @@ class Analytical_Solution:
         ACF = np.zeros(len(times))
         admit_guy = np.real(admit_func(self.frequencies)) / self.frequencies ** 2
         for i in range(len(times)):
-            ACF[i] = scipy.integrate.simps(np.cos(self.frequencies * times[i]) * admit_guy, self.frequencies)
+            ACF[i] = scipy.integrate.simpson(np.cos(self.frequencies * times[i]) * admit_guy, x=self.frequencies)
 
         return ACF
 
@@ -110,7 +110,7 @@ class Analytical_Solution:
         SPD = tSPD_func(frequencies, SPD_func(frequencies, admit_func), gamma(frequencies), mass)
         for i in range(len(times)):
             ACF[i] = 2 * np.real(
-                scipy.integrate.simps(SPD * np.exp(-1j * frequencies * times[i] * frequencies) / (2 * np.pi)))
+                scipy.integrate.simpson(SPD * np.exp(-1j * frequencies * times[i] * frequencies) / (2 * np.pi)))
 
         return ACF
 
