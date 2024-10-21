@@ -1,7 +1,6 @@
 import math
-
 import matplotlib.pyplot as plt
-
+import pickle
 from simulation import *
 from analytical import *
 from gomez_analytical import *
@@ -17,20 +16,19 @@ def run():
     b = 5 # Scaling dilation parameter that determines the low cutoff frequency ν_0*b^-n
     c = 1.78167 # a prefactor that depends on the particular choice of b
     v_0 = 1e3 # High cutoff frequency (already scaled by tao_c)
-    a = 1e-6 # Particle size
+    a = 3e-6 # Particle size
     eta = 1e-3 # Viscosity of water
     rho_silica = 2200 # Density of silica
     rho_f = 1000 # Density of water
 
-    # Might be arrays
     mass = (4 / 3) * math.pi * (a / 2.0) ** 3 * rho_silica
     mass_total = mass + .5 * (4 / 3) * math.pi * (a/2.0)** 3 * rho_f # Mass plus added mass
 
-    temp = 273
+    temp = 293
 
     lag_fraction = 1
     sample_rate = 1
-    simulation_number = 5#100
+    simulation_number = 10
 
     # ANALYTICAL PARAMETERS
     c_water = 1500
@@ -40,7 +38,7 @@ def run():
     VSP_length = 1000
     integ_points = 10 ** 4 * 8
     start = -10
-    stop = -7
+    stop = -5
     time_range = (start, stop)
     time_points = 60
 
@@ -60,27 +58,36 @@ def run():
     gamma_0 = 0.5*gamma*c*math.sqrt(tao_fc/math.pi)*sum(math.sqrt(v) for v in v_i)
     delta = gamma_0/gamma
 
+    # Save tao_c and other parameters to a Pickle file
+    params = {
+        'mass_total': mass_total,
+        'sample_rate': sample_rate,
+        'timestep': timestep,
+        'tao_c': tao_c,
+        'v_c': v_c,
+        'x_c': x_c
+    }
+    with open('simulation_params.pkl', 'wb') as f:
+        pickle.dump(params, f)
+
     trace_length = int((10**stop)/(timestep*tao_c))
 
     # Run the analytics
     sol = Analytical_Solution(rho_f, c_water, eta, bulk, a, rho_silica, K, tao_f, mass, mass_total, gamma, temp, VSP_length, integ_points, time_range=time_range, time_points=time_points)
     times, freq, VPSD_cw, VPSD_iw, PSD_iw, PSD_cw, VACF_cw, VACF_iw, PACF_cw, PACF_iw, TPSD_cw, TPSD_iw = sol.calculate()
 
-    pacf = False
-    vacf = False
+    pacf = True
+    vacf = True
     msd = False
-    psd = False
+    psd = True
     save = True
 
     # Run the simulation
     mep = MarkovianEmbeddingProcess(n, v_i, gamma_i, delta, timestep, sample_rate, lag_fraction, temp=temp, mass=mass_total, gamma=gamma)
     mep.run_numerical_simulation(simulation_number, trace_length, pacf, vacf, msd, psd, graph=False, save=save)
 
-    gom = GomezAnalytical(tao_c, tao_f, start, stop)
-
     # Graph
     if vacf:
-        #gom.graph()
         VACF_iw/= (const.k * temp / mass_total)
         mep.graph_VACF(10**start, 10**stop)
         plt.plot(times, VACF_iw, label="Analytical")

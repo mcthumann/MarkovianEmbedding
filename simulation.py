@@ -258,7 +258,8 @@ class MarkovianEmbeddingProcess:
     def graph_PACF(self):
         all_pacf_np = np.array(self.all_pacf)
         mean_pacf = np.mean(all_pacf_np, axis = 0)
-        plt.plot([t*(self.timestep*self.sample_rate)*self.t_c for t in range(np.size(mean_pacf))], mean_pacf, label="Simulation")
+        plt.plot([t*(self.timestep*self.sample_rate)*self.t_c for t in range(1, np.size(mean_pacf))], mean_pacf[1:], label="Simulation")
+        plt.xscale('log')
 
     def graph_VACF(self, start, stop):
         all_vacf_np = np.array(self.all_vacf)
