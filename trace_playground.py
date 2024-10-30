@@ -29,6 +29,7 @@ class DataProcessor:
         self.sample_rate = params['sample_rate']
         self.t_c  = params['tao_c']
         self.v_c = params['v_c']
+        print("v_c " + str(self.v_c))
         self.x_c  = params['x_c']
         self.k_b = scipy.constants.k
 
@@ -38,7 +39,10 @@ class DataProcessor:
         self.all_vacf = []
         self.all_msd = []
         self.all_psd = []
-        self.all_delta_Q = [[] for _ in range(7)]
+
+
+        self.heat_transfer_lags = np.array([.003, .01, .03, .1, .3, 1, 3])
+        self.all_delta_Q = [[] for _ in range(len(self.heat_transfer_lags))]
 
     def compute_PACF(self, position_trace, transient=0.0):
         trace = position_trace[int(transient * len(position_trace)):]
@@ -118,19 +122,18 @@ class DataProcessor:
                 v_t_lag = trace[lag:]  # Velocity at time t_0 + lag
 
                 # Compute Delta Q for all t_0 at once
-                self.all_delta_Q[i].extend(((self.mass_total / 2) * (v_t_lag ** 2))/(self.k_b*293) - ((self.mass_total / 2) * (v_t0 ** 2))/(self.k_b*293))
+                self.all_delta_Q[i].extend(((self.mass_total / 2) * (v_t_lag ** 2) * self.v_c**2 / (self.k_b*293)) - ((self.mass_total / 2) * (v_t0 ** 2) * self.v_c**2 / (self.k_b*293)))
 
     def process_traces(self):
-        heat_transfer_lags = np.array([.003, .01, .03, .1, .3, 1, 3])
         for i in range(0, num_traces):
             print("Working on trace", i)
             position_trace = self.df[f'Position {i}']
             velocity_trace = self.df[f'Velocity {i}']
-            self.compute_PACF(position_trace)
+            # self.compute_PACF(position_trace)
             self.compute_VACF(velocity_trace)
-            self.compute_MSD(position_trace)
-            self.compute_PSD(velocity_trace)
-            self.compute_heat_transfer(velocity_trace, heat_transfer_lags)
+            # self.compute_MSD(position_trace)
+            # self.compute_PSD(velocity_trace)
+            self.compute_heat_transfer(velocity_trace, self.heat_transfer_lags)
 
     def graph_PSD(self):
         all_psd_np = np.array([psd for _, psd in self.all_psd])
@@ -207,15 +210,15 @@ class DataProcessor:
 
             counts, bin_edges = np.histogram(dataset, bins=bins)
             # Plot the dataset using the bin edges and modified counts
-            plt.step(bin_edges[:-1], counts/len(self.all_delta_Q[i]), where='mid', label=f'Distribution {i + 1}', alpha=0.7)
+            plt.step(bin_edges[:-1], counts/len(self.all_delta_Q[i]), where='mid', label=f't = {self.heat_transfer_lags[i]} * t_c', alpha=0.7)
 
         # Set y-axis to log scale (ensures no zero counts)
         plt.yscale('log')
 
         # Add labels and legend
-        plt.xlabel('Heat Exchanged')
-        plt.ylabel('Counts (Log Scale)')
-        plt.title('Overlapping Histograms of 5 Distributions')
+        plt.xlabel('Heat Exchanged (Q/k_b*t)')
+        plt.ylabel('Normalized Counts P(Q, t)')
+        plt.title('Probability Density of Exchanged Energy: Silica and Water')
         plt.legend()
         plt.show()
 
@@ -226,9 +229,9 @@ processor = DataProcessor(df)
 # Process all traces
 processor.process_traces()
 
-# Plot the results
-processor.graph_PSD()
-processor.graph_PACF()
+# # Plot the results
+# processor.graph_PSD()
+# processor.graph_PACF()
 processor.graph_VACF()
-processor.graph_MSD()
+# processor.graph_MSD()
 processor.graph_heat_transfer_variance()
