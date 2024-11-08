@@ -20,17 +20,13 @@ class DataProcessor:
         self.df = df
         self.lag_fraction = lag_fraction
 
-        # Load parameters from the Pickle file
-        with open('simulation_params.pkl', 'rb') as f:
-            params = pickle.load(f)
-
-        self.mass_total = params['mass_total']
-        self.timestep = params['timestep']
-        self.sample_rate = params['sample_rate']
-        self.t_c  = params['tao_c']
-        self.v_c = params['v_c']
+        self.mass_total = df['mass_total']
+        self.timestep = df['timestep']
+        self.sample_rate = df['sample_rate']
+        self.t_c  = df['tao_c']
+        self.v_c = df['v_c']
         print("v_c " + str(self.v_c))
-        self.x_c  = params['x_c']
+        self.x_c  = df['x_c']
         self.k_b = scipy.constants.k
 
         print(self.timestep, self.sample_rate, self.t_c, self.v_c, self.x_c)

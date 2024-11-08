@@ -1,5 +1,3 @@
-import math
-import matplotlib.pyplot as plt
 import pickle
 from simulation import *
 from analytical import *
@@ -28,7 +26,7 @@ def run():
 
     lag_fraction = 1
     sample_rate = 1
-    simulation_number = 10
+    simulation_number = 1
 
     # ANALYTICAL PARAMETERS
     c_water = 1500
@@ -58,17 +56,15 @@ def run():
     gamma_0 = 0.5*gamma*c*math.sqrt(tao_fc/math.pi)*sum(math.sqrt(v) for v in v_i)
     delta = gamma_0/gamma
 
-    # Save tao_c and other parameters to a Pickle file
-    params = {
-        'mass_total': mass_total,
-        'sample_rate': sample_rate,
-        'timestep': timestep,
-        'tao_c': tao_c,
-        'v_c': v_c,
-        'x_c': x_c
-    }
-    with open('simulation_params.pkl', 'wb') as f:
-        pickle.dump(params, f)
+    df = pd.DataFrame({
+        'CreationDate': [pd.Timestamp.now()],
+        'mass_total': [mass_total],
+        'sample_rate': [sample_rate],
+        'timestep': [timestep],
+        'tao_c': [tao_c],
+        'v_c': [v_c],
+        'x_c': [x_c]
+    })
 
     trace_length = int((10**stop)/(timestep*tao_c))
 
@@ -84,7 +80,7 @@ def run():
 
     # Run the simulation
     mep = MarkovianEmbeddingProcess(n, v_i, gamma_i, delta, timestep, sample_rate, lag_fraction, temp=temp, mass=mass_total, gamma=gamma)
-    mep.run_numerical_simulation(simulation_number, trace_length, pacf, vacf, msd, psd, graph=False, save=save)
+    mep.run_numerical_simulation(simulation_number, trace_length, pacf, vacf, msd, psd, df, graph=False, save=save)
 
     # Graph
     if vacf:
@@ -117,18 +113,18 @@ def run():
         plt.title("MSD")
         plt.show()
 
-    # Find spots where velocity is zero
-    index_mult = (timestep * sample_rate) * tao_c
-    plt.plot([t * index_mult for t in range(len(mep.all_x))], mep.all_x * x_c, linewidth=0.5)
-
-    tolerance = .001
-    close_to_zero_indices = np.where(abs(mep.all_v) < tolerance)[0]
-
-    plt.title("Positions")
-    # Draw vertical lines where values are close to zero
-    for index in close_to_zero_indices:
-        plt.axvline(x=index*index_mult, color='red', linestyle='-', linewidth=0.1)
-    plt.show()
+    # # Find spots where velocity is zero
+    # index_mult = (timestep * sample_rate) * tao_c
+    # plt.plot([t * index_mult for t in range(len(mep.all_x))], mep.all_x * x_c, linewidth=0.5)
+    #
+    # tolerance = .0001
+    # close_to_zero_indices = np.where(abs(mep.all_v) < tolerance)[0]
+    #
+    # plt.title("Positions")
+    # # Draw vertical lines where values are close to zero
+    # for index in close_to_zero_indices:
+    #     plt.axvline(x=index*index_mult, color='red', linestyle='-', linewidth=0.1)
+    # plt.show()
 
 if __name__ == '__main__':
     run()

@@ -110,13 +110,12 @@ class MarkovianEmbeddingProcess:
         self.curr_v = curr_v
         self.curr_u = curr_u
 
-    def run_numerical_simulation(self, sim_num, trace_len, pacf=False, vacf=False, msd=False, psd=False, graph=False, save=True):
+    def run_numerical_simulation(self, sim_num, trace_len, pacf=False, vacf=False, msd=False, psd=False, df = None, graph=False, save=True):
         print("Will Simulate " + str(trace_len * self.sample_rate) + " points, sampling every " + str(self.sample_rate)
               + " for a duration of " + str(trace_len * self.sample_rate * self.timestep) + " time constants")
 
         self.reset_trace(trace_len)
-        if save:
-            df = pd.DataFrame()
+
         for i in range(sim_num):
             print("Trace " + str(i) + ": ")
             for j in range(trace_len):
@@ -146,11 +145,13 @@ class MarkovianEmbeddingProcess:
                 if df.empty:
                     # If the main DataFrame is empty, just set it equal to the temp_df
                     df = temp_df
+                    print("empty df")
                 else:
+                    print("concat")
                     # Concatenate the new columns with the existing DataFrame
                     df = pd.concat([df.reset_index(drop=True), temp_df.reset_index(drop=True)], axis=1)
 
-            if i < sim_num - 1:
+            if i < sim_num:
                 if save:
                     df.to_csv('position_velocity_data.csv', index=False, mode='w')
                 self.reset_trace(trace_len)
