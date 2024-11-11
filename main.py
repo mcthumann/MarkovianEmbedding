@@ -23,6 +23,7 @@ def run():
     mass_total = mass + .5 * (4 / 3) * math.pi * (a/2.0)** 3 * rho_f # Mass plus added mass
 
     temp = 293
+    K = 1e-3
 
     lag_fraction = 1
     sample_rate = 1
@@ -31,12 +32,11 @@ def run():
     # ANALYTICAL PARAMETERS
     c_water = 1500
     bulk = 2.5E-3
-    K = 0  # May need update here
 
     VSP_length = 1000
     integ_points = 10 ** 4 * 8
     start = -10
-    stop = -5
+    stop = -6
     time_range = (start, stop)
     time_points = 60
 
@@ -79,7 +79,7 @@ def run():
     save = True
 
     # Run the simulation
-    mep = MarkovianEmbeddingProcess(n, v_i, gamma_i, delta, timestep, sample_rate, lag_fraction, temp=temp, mass=mass_total, gamma=gamma)
+    mep = MarkovianEmbeddingProcess(n, v_i, gamma_i, delta, timestep, sample_rate, lag_fraction, K=K, temp=temp, mass=mass_total, gamma=gamma)
     mep.run_numerical_simulation(simulation_number, trace_length, pacf, vacf, msd, psd, df, graph=False, save=save)
 
     # Graph
@@ -87,6 +87,7 @@ def run():
         VACF_iw/= (const.k * temp / mass_total)
         mep.graph_VACF(10**start, 10**stop)
         plt.plot(times, VACF_iw, label="Analytical")
+        plt.plot(times, sol.standalone_vacf(times)/(const.k * temp / mass_total), label="Standalone Analytical")
         plt.legend()
         plt.title("VACF")
         plt.xscale("log")

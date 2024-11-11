@@ -27,7 +27,7 @@ class MarkovianEmbeddingProcess:
     """
     # First, we initialize x, v and u appropriately. Entries of u should be initialized by sampling randomly
     # from a gaussian distribution with mean 0 and variance gamma_i.
-    def __init__(self, n, v_i, gamma_i, delta, timestep, sample_rate, lag_fraction, temp=-1, mass=-1, gamma=-1):
+    def __init__(self, n, v_i, gamma_i, delta, timestep, sample_rate, lag_fraction, K = 0, temp=-1, mass=-1, gamma=-1):
         # Parameters
         self.n = n # Number of auxliary stochastic variables
         self.v_i = v_i
@@ -40,6 +40,7 @@ class MarkovianEmbeddingProcess:
         self.temp = temp
         self.mass = mass
         self.gamma = gamma
+        self.K = K
 
         self.t_c = 1
         self.x_c = 1
@@ -48,6 +49,7 @@ class MarkovianEmbeddingProcess:
             self.v_c = math.sqrt((const.k*self.temp)/self.mass)
             self.t_c = self.mass/self.gamma
             self.x_c = self.v_c*self.t_c
+            self.f_c = (const.k*self.temp)/(self.t_c*self.v_c)
 
         self.timestep = timestep
         # Single step variables
@@ -95,13 +97,17 @@ class MarkovianEmbeddingProcess:
 
             next_u = [((1 - self.v_i[j]*self.timestep)*curr_u[j] - self.gamma_i[j]*self.timestep*curr_v +
                        math.sqrt(2*self.gamma_i[j]*self.v_i[j]*self.timestep)*N_i[j]) for j in range(self.n)]
-            next_v = ((1 - (1+self.delta)*self.timestep)*curr_v + - self.timestep*sum(curr_u) +
+            next_v = ((1 - (1+self.delta)*self.timestep)*curr_v - self.timestep*sum(curr_u) -
+                      self.timestep*(self.x_c/self.f_c)*self.K*curr_x +
                       math.sqrt(2*self.timestep)*(math.sqrt(self.delta)*N_0 + N_i[self.n]))
             next_x = curr_x + self.timestep*curr_v
             curr_u = next_u
             curr_v = next_v
             curr_x = next_x
-
+        # print(const.k)
+        # print(self.v_c)
+        # print(self.t_c)
+        # print((self.v_c/((const.k * self.temp)/(self.v_c*self.t_c))))
         self.all_x[state_ind] = curr_x
         self.all_v[state_ind] = curr_v
         self.all_u[state_ind] = curr_u

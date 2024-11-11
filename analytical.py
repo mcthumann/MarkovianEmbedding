@@ -6,6 +6,7 @@ import pandas as pd
 plt.ticklabel_format(style='sci', axis='x', scilimits=(0,0), useMathText=True)
 import numpy as np
 import scipy
+import math
 
 class Analytical_Solution:
     def __init__(self, density, c, shear, bulk, a, particle_density, K, tau_f, m, M, gamma_s, T, VSP_length, integ_points, time_range=(-10, -5), time_points=60):
@@ -157,6 +158,30 @@ class Analytical_Solution:
 
         return self.times, freq, VSPD_compressible, VSPD_incompressible, PSD_incompressible, PSD_compressible, VACF_compressible, VACF_incompressible, PACF_compressible, PACF_incompressible, TPSD_compressible, TPSD_incompressible
 
+    def standalone_vacf(self, t):
+        t_k = (6 * math.pi * self.a * self.shear)/self.K
+        t_f = (self.density*self.a**2)/self.shear
+        t_p = self.M/(6 * math.pi * self.a * self.shear)
+        # find roots
+        # a * z^4 + b * z^3 + c * z^2 + d * z + e = 0
+        a = t_p + (1/9.0)*t_f
+        b = -np.sqrt(t_f)
+        c = 1
+        d = 0
+        e = 1 / t_k
+
+        # Coefficients array for the polynomial equation
+        coefficients = [a, b, c, d, e]
+
+        # Find the roots
+        roots = np.roots(coefficients)
+        print(roots)
+        # Calculate the VACF
+        vacf_complex = (self.k_b * self.T / self.M) * sum(
+            (z ** 3 * np.exp(z ** 2 * t) * scipy.special.erfc(z * np.sqrt(t))) /
+            (np.prod([z - z_j for z_j in roots if z != z_j])) for z in roots
+        )
+        return np.real(vacf_complex)
 
     def shot_noise_VPSD(omega, sensitivity):
         return sensitivity * omega ** 2
