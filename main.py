@@ -1,7 +1,7 @@
+import math
 import pickle
 from simulation import *
 from analytical import *
-from gomez_analytical import *
 
 # "100 independent trajectories starting from the abovementioned initial conditions are simulated with a
 # time-step ∆t = 10−4 τc, a total duration of 103 τc and then sampled at a frequency 103τ−1c thus amounting
@@ -23,11 +23,11 @@ def run():
     mass_total = mass + .5 * (4 / 3) * math.pi * (a/2.0)** 3 * rho_f # Mass plus added mass
 
     temp = 293
-    K = 1e-3
+    K = 1e2
 
     lag_fraction = 1
     sample_rate = 1
-    simulation_number = 1
+    simulation_number = 3
 
     # ANALYTICAL PARAMETERS
     c_water = 1500
@@ -36,7 +36,7 @@ def run():
     VSP_length = 1000
     integ_points = 10 ** 4 * 8
     start = -10
-    stop = -6
+    stop = -5
     time_range = (start, stop)
     time_points = 60
 
@@ -103,7 +103,7 @@ def run():
 
     if psd:
         mep.graph_PSD()
-        plt.semilogx(freq, VPSD_iw, label="Analytical")
+        plt.semilogx(freq/(2*math.pi), VPSD_iw, label="Analytical")
         plt.legend()
         plt.xlim(1/10**stop, 1/10**start)
         plt.title("PSD")
