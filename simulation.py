@@ -208,7 +208,6 @@ class MarkovianEmbeddingProcess:
 
         # Normalize by the number of terms contributing to each lag
         acf /= np.arange(N, N - max_lag, -1)
-
         self.all_vacf.append(acf)
 
     def compute_MSD(self, skip_lags=1, transient=0.0):
@@ -232,12 +231,11 @@ class MarkovianEmbeddingProcess:
         self.all_msd.append(msd)
 
     def compute_PSD(self, transient=0.0):
-        # Extract the velocity trace, excluding the transient portion if necessary
         trace = np.array(self.all_x[int(transient * len(self.all_x)):])
-        # Compute the Fourier transform of the velocity data
+
         fft_result = fft(trace)
         # Compute the Power Spectral Density (PSD)
-        psd = np.abs(fft_result) ** 2 / len(trace)
+        psd = np.abs(fft_result) ** 2 * self.timestep / len(trace)
         # Generate the corresponding frequencies
         freqs = np.fft.fftfreq(len(trace), d=self.timestep)
         # Take only the positive frequencies and PSD values
@@ -250,7 +248,7 @@ class MarkovianEmbeddingProcess:
         # Unpack and average the PSDs over all stored tuples
         all_psd_np = np.array([psd for _, psd in self.all_psd])
         mean_psd = np.mean(all_psd_np, axis=0)
-        mean_psd=mean_psd*((self.v_c**2)*self.t_c)
+        mean_psd=mean_psd*((self.x_c**2)*self.t_c)
         # Frequencies should be the same for all PSDs, so just take the first one
         positive_freqs = np.array(self.all_psd[0][0])/self.t_c
 

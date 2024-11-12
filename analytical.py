@@ -126,38 +126,39 @@ class Analytical_Solution:
     def calculate(self):
         power = np.linspace(0, 10.5, self.VSP_length)
         freq = (np.ones(self.VSP_length) * 10) ** power
-        VSPD_compressible = self.velocity_spectral_density(freq, self.admittance)
+        # VSPD_compressible = self.velocity_spectral_density(freq, self.admittance)
         VSPD_incompressible = self.velocity_spectral_density(freq, self.incompressible_admittance)
-        PSD_incompressible = VSPD_incompressible / (2*math.pi*freq)**2
-        # PSD_incompressible = self.PSD_standalone(freq*2*math.pi)
-        PSD_compressible = VSPD_compressible / (2*math.pi*freq)**2
+        # PSD_incompressible = VSPD_incompressible / freq
+        PSD_incompressible = self.PSD_standalone(freq*2*math.pi)
+        # PSD_compressible = VSPD_compressible / freq
 
-        TPSD_compressible = self.thermal_force_PSD(freq, PSD_compressible, self.gamma(freq), self.m)
+        # TPSD_compressible = self.thermal_force_PSD(freq, PSD_compressible, self.gamma(freq), self.m)
         TPSD_incompressible = self.thermal_force_PSD(freq, PSD_incompressible, self.incompressible_gamma(freq), self.M)
 
-        VACF_compressible = self.ACF_from_SPD(self.admittance, self.velocity_spectral_density, self.times)
+        # VACF_compressible = self.ACF_from_SPD(self.admittance, self.velocity_spectral_density, self.times)
         VACF_incompressible = self.ACF_from_SPD(self.incompressible_admittance, self.velocity_spectral_density, self.times)
+        # VACF_incompressible = self.standalone_vacf(self.times)
 
-        PACF_compressible = self.ACF_from_SPD(self.admittance, self.position_spectral_density, self.times)
+        # PACF_compressible = self.ACF_from_SPD(self.admittance, self.position_spectral_density, self.times)
         PACF_incompressible = self.ACF_from_SPD(self.incompressible_admittance, self.position_spectral_density, self.times)
 
-        MSD_compressible = self.mean_square_displacement(PACF_compressible)
+        # MSD_compressible = self.mean_square_displacement(PACF_compressible)
         MSD_incompressible = self.mean_square_displacement(PACF_incompressible)
 
         confinement = self.K
         if self.K == 0:
             confinement = self.gamma_s
 
-        compress_correction = (self.k_b * self.T / confinement / PACF_compressible[0])
+        # compress_correction = (self.k_b * self.T / confinement / PACF_compressible[0])
         incompress_correction = (self.k_b * self.T / confinement / PACF_incompressible[0])
 
-        PACF_incompressible *= compress_correction
-        PACF_compressible *= incompress_correction
+        # PACF_incompressible *= compress_correction
+        # PACF_compressible *= incompress_correction
 
-        TPSD_compressible = self.thermal_force_PSD(freq, PSD_compressible, self.gamma(freq), self.m)
+        # TPSD_compressible = self.thermal_force_PSD(freq, PSD_compressible, self.gamma(freq), self.m)
         TPSD_incompressible = self.thermal_force_PSD(freq, PSD_incompressible, self.incompressible_gamma(freq), self.M)
 
-        return self.times, freq, VSPD_compressible, VSPD_incompressible, PSD_incompressible, PSD_compressible, VACF_compressible, VACF_incompressible, PACF_compressible, PACF_incompressible, TPSD_compressible, TPSD_incompressible
+        return self.times, freq, VSPD_incompressible, PSD_incompressible, VACF_incompressible, PACF_incompressible, TPSD_incompressible
 
     def standalone_vacf(self, t):
         t_k = (6 * math.pi * self.a * self.shear)/self.K

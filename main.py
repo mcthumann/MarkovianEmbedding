@@ -23,11 +23,11 @@ def run():
     mass_total = mass + .5 * (4 / 3) * math.pi * (a/2.0)** 3 * rho_f # Mass plus added mass
 
     temp = 293
-    K = 1e4
+    K = 1
 
     lag_fraction = 1
     sample_rate = 1
-    simulation_number = 3
+    simulation_number = 5
 
     # ANALYTICAL PARAMETERS
     c_water = 1500
@@ -70,7 +70,7 @@ def run():
 
     # Run the analytics
     sol = Analytical_Solution(rho_f, c_water, eta, bulk, a, rho_silica, K, tao_f, mass, mass_total, gamma, temp, VSP_length, integ_points, time_range=time_range, time_points=time_points)
-    times, freq, VPSD_cw, VPSD_iw, PSD_iw, PSD_cw, VACF_cw, VACF_iw, PACF_cw, PACF_iw, TPSD_cw, TPSD_iw = sol.calculate()
+    times, freq, VPSD_iw, PSD_iw, VACF_iw, PACF_iw, TPSD_iw = sol.calculate()
 
     pacf = True
     vacf = True
@@ -103,7 +103,7 @@ def run():
 
     if psd:
         mep.graph_PSD()
-        plt.semilogx(freq/(2*math.pi), VPSD_iw, label="Analytical")
+        plt.semilogx(freq, PSD_iw, label="Analytical")
         plt.legend()
         plt.xlim(1/10**stop, 1/10**start)
         plt.title("PSD")
