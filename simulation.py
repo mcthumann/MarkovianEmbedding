@@ -94,11 +94,10 @@ class MarkovianEmbeddingProcess:
         for k in range(self.sample_rate):
             N_i = np.random.normal(0,1, self.n+1)
             N_0 = sum([math.sqrt(self.gamma_i[j]/(self.v_i[j]*self.delta))*N_i[j] for j in range(self.n)])
-
             next_u = [((1 - self.v_i[j]*self.timestep)*curr_u[j] - self.gamma_i[j]*self.timestep*curr_v +
                        math.sqrt(2*self.gamma_i[j]*self.v_i[j]*self.timestep)*N_i[j]) for j in range(self.n)]
             next_v = ((1 - (1+self.delta)*self.timestep)*curr_v - self.timestep*sum(curr_u) -
-                      self.timestep*(self.x_c/self.f_c)*self.K*curr_x +
+                      self.timestep*self.K*curr_x*(self.x_c/self.f_c) +
                       math.sqrt(2*self.timestep)*(math.sqrt(self.delta)*N_0 + N_i[self.n]))
             next_x = curr_x + self.timestep*curr_v
             curr_u = next_u
@@ -234,7 +233,7 @@ class MarkovianEmbeddingProcess:
 
     def compute_PSD(self, transient=0.0):
         # Extract the velocity trace, excluding the transient portion if necessary
-        trace = np.array(self.all_v[int(transient * len(self.all_v)):])
+        trace = np.array(self.all_x[int(transient * len(self.all_x)):])
         # Compute the Fourier transform of the velocity data
         fft_result = fft(trace)
         # Compute the Power Spectral Density (PSD)
