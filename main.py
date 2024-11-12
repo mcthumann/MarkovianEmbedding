@@ -23,7 +23,7 @@ def run():
     mass_total = mass + .5 * (4 / 3) * math.pi * (a/2.0)** 3 * rho_f # Mass plus added mass
 
     temp = 293
-    K = 1e2
+    K = 1e4
 
     lag_fraction = 1
     sample_rate = 1

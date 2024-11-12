@@ -128,8 +128,9 @@ class Analytical_Solution:
         freq = (np.ones(self.VSP_length) * 10) ** power
         VSPD_compressible = self.velocity_spectral_density(freq, self.admittance)
         VSPD_incompressible = self.velocity_spectral_density(freq, self.incompressible_admittance)
-        PSD_incompressible = VSPD_incompressible / freq ** 2
-        PSD_compressible = VSPD_compressible / freq ** 2
+        PSD_incompressible = VSPD_incompressible / (2*math.pi*freq)**2
+        # PSD_incompressible = self.PSD_standalone(freq*2*math.pi)
+        PSD_compressible = VSPD_compressible / (2*math.pi*freq)**2
 
         TPSD_compressible = self.thermal_force_PSD(freq, PSD_compressible, self.gamma(freq), self.m)
         TPSD_incompressible = self.thermal_force_PSD(freq, PSD_incompressible, self.incompressible_gamma(freq), self.M)
@@ -183,7 +184,7 @@ class Analytical_Solution:
         )
         return np.real(vacf_complex)
 
-    def shot_noise_VPSD(omega, sensitivity):
+    def shot_noise_VPSD(self, omega, sensitivity):
         return sensitivity * omega ** 2
 
 
@@ -194,3 +195,13 @@ class Analytical_Solution:
                 cumulative[i] += SD[j]
 
         return cumulative
+
+    def PSD_standalone(self, omega):
+        # This is the PSD we look to fit.  We fit for 3 parameters
+        # Namely, we fit for the trap strength K, the radius of the particle a, and the voltage to position conversion V
+        gamma_s = 6 * math.pi * self.a * self.shear
+        tau_f = self.density * self.a ** 2 / self.shear
+        numerator = 2 * self.k_b * self.T * gamma_s * (1 + np.sqrt((1 / 2) * omega * tau_f))
+        denominator = (self.K - omega * gamma_s * np.sqrt((1 / 2) * omega * tau_f)) ** 2 + omega ** 2 * gamma_s ** 2 * (
+                1 + np.sqrt((1 / 2) * omega * tau_f)) ** 2
+        return numerator / denominator
