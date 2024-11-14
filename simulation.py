@@ -9,7 +9,7 @@
 # TODO Figure out why the parameters n, b, c, v_0, were set as stated
 
 # TODO add the looping to the mep
-
+import scipy
 import math
 import numpy as np
 from numpy.fft import fft, ifft
@@ -196,6 +196,14 @@ class MarkovianEmbeddingProcess:
         self.all_pacf.append(acf)
 
     def compute_VACF(self, transient=0.0):
+        series = self.all_x[int(transient * len(self.all_x)):]
+        v_series = np.diff(series)/np.diff(np.arange(0, len(series)) * self.timestep)
+        f_signal = np.fft.fft(v_series, n=2 * len(v_series))
+        vacf = np.fft.ifft(f_signal * np.conjugate(f_signal)).real[:len(v_series)]
+        vacf = vacf*((const.k *self.temp)/self.mass)
+        self.all_vacf.append(vacf)
+
+    def compute_VACF2(self, transient=0.0):
         # Remove transient section
         v = self.all_v[int(transient * len(self.all_v)):]
         N = len(v)
@@ -233,24 +241,19 @@ class MarkovianEmbeddingProcess:
     def compute_PSD(self, transient=0.0):
         trace = np.array(self.all_x[int(transient * len(self.all_x)):])
 
-        fft_result = fft(trace)
-        # Compute the Power Spectral Density (PSD)
-        psd = np.abs(fft_result) ** 2 * self.timestep / len(trace)
-        # Generate the corresponding frequencies
-        freqs = np.fft.fftfreq(len(trace), d=self.timestep)
-        # Take only the positive frequencies and PSD values
-        positive_freqs = freqs[:len(freqs) // 2]
-        psd = psd[:len(psd) // 2]
+        frequency, psd = scipy.signal.periodogram(trace, 1 / (self.timestep), scaling="density")
+        frequency /= self.t_c
+        psd *= (self.x_c**2)*self.t_c
+
         # Store or return the computed PSD
-        self.all_psd.append((positive_freqs, psd))
+        self.all_psd.append((frequency, psd))
 
     def graph_PSD(self):
         # Unpack and average the PSDs over all stored tuples
         all_psd_np = np.array([psd for _, psd in self.all_psd])
         mean_psd = np.mean(all_psd_np, axis=0)
-        mean_psd=mean_psd*((self.x_c**2)*self.t_c)
         # Frequencies should be the same for all PSDs, so just take the first one
-        positive_freqs = np.array(self.all_psd[0][0])/self.t_c
+        positive_freqs = np.array(self.all_psd[0][0])
 
         # Plot the mean PSD
         plt.plot(positive_freqs, mean_psd, label="Simulation")

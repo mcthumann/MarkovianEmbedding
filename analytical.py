@@ -161,12 +161,13 @@ class Analytical_Solution:
         return self.times, freq, VSPD_incompressible, PSD_incompressible, VACF_incompressible, PACF_incompressible, TPSD_incompressible
 
     def standalone_vacf(self, t):
+        t = t*(math.pi / 2)
         t_k = (6 * math.pi * self.a * self.shear)/self.K
         t_f = (self.density*self.a**2)/self.shear
         t_p = self.M/(6 * math.pi * self.a * self.shear)
         # find roots
         # a * z^4 + b * z^3 + c * z^2 + d * z + e = 0
-        a = t_p + (1/9.0)*t_f
+        a = t_p + ((1/9.0)*t_f)
         b = -np.sqrt(t_f)
         c = 1
         d = 0
@@ -189,7 +190,7 @@ class Analytical_Solution:
         return sensitivity * omega ** 2
 
 
-    def cumulative(SD):
+    def cumulative(self, SD):
         cumulative = np.zeros(len(SD))
         for i in range(len(SD)):
             for j in range(i):
@@ -203,6 +204,6 @@ class Analytical_Solution:
         gamma_s = 6 * math.pi * self.a * self.shear
         tau_f = self.density * self.a ** 2 / self.shear
         numerator = 2 * self.k_b * self.T * gamma_s * (1 + np.sqrt((1 / 2) * omega * tau_f))
-        denominator = (self.K - omega * gamma_s * np.sqrt((1 / 2) * omega * tau_f)) ** 2 + omega ** 2 * gamma_s ** 2 * (
+        denominator = (self.M*((self.K/self.M)-omega**2) - omega * gamma_s * np.sqrt((1 / 2) * omega * tau_f)) ** 2 + omega ** 2 * gamma_s ** 2 * (
                 1 + np.sqrt((1 / 2) * omega * tau_f)) ** 2
         return numerator / denominator

@@ -23,11 +23,11 @@ def run():
     mass_total = mass + .5 * (4 / 3) * math.pi * (a/2.0)** 3 * rho_f # Mass plus added mass
 
     temp = 293
-    K = 1
+    K = 10
 
     lag_fraction = 1
     sample_rate = 1
-    simulation_number = 5
+    simulation_number = 1
 
     # ANALYTICAL PARAMETERS
     c_water = 1500
@@ -56,17 +56,23 @@ def run():
     gamma_0 = 0.5*gamma*c*math.sqrt(tao_fc/math.pi)*sum(math.sqrt(v) for v in v_i)
     delta = gamma_0/gamma
 
+    trace_length = int((10**stop)/(timestep*tao_c))
+
     df = pd.DataFrame({
         'CreationDate': [pd.Timestamp.now()],
-        'mass_total': [mass_total],
+        'a': [a],
+        'eta': [eta],
+        'rho_silica': [rho_silica],
+        'rho_f': [rho_f],
+        'sampling_rate': [(1.0/timestep)],
+        'stop': [stop],
+        'start': [start],
+        'track_len': [trace_length],
         'sample_rate': [sample_rate],
-        'timestep': [timestep],
         'tao_c': [tao_c],
         'v_c': [v_c],
         'x_c': [x_c]
     })
-
-    trace_length = int((10**stop)/(timestep*tao_c))
 
     # Run the analytics
     sol = Analytical_Solution(rho_f, c_water, eta, bulk, a, rho_silica, K, tao_f, mass, mass_total, gamma, temp, VSP_length, integ_points, time_range=time_range, time_points=time_points)
