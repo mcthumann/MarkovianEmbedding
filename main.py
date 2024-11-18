@@ -1,7 +1,7 @@
+import math
 import pickle
 from simulation import *
 from analytical import *
-from gomez_analytical import *
 
 # "100 independent trajectories starting from the abovementioned initial conditions are simulated with a
 # time-step ∆t = 10−4 τc, a total duration of 103 τc and then sampled at a frequency 103τ−1c thus amounting
@@ -23,23 +23,22 @@ def run():
     mass_total = mass + .5 * (4 / 3) * math.pi * (a/2.0)** 3 * rho_f # Mass plus added mass
 
     temp = 293
+    K = 1e-7
 
     lag_fraction = 1
     sample_rate = 1
-    simulation_number = 1
+    simulation_number = 2
 
     # ANALYTICAL PARAMETERS
     c_water = 1500
     bulk = 2.5E-3
-    K = 0  # May need update here
 
     VSP_length = 1000
     integ_points = 10 ** 4 * 8
     start = -10
-    stop = -5
+    stop = -4
     time_range = (start, stop)
-    time_points = 60
-
+    time_points = 600
 
     # HELPER PARAMETERS
     timestep = 1E-4  # Simulation timestep
@@ -56,21 +55,27 @@ def run():
     gamma_0 = 0.5*gamma*c*math.sqrt(tao_fc/math.pi)*sum(math.sqrt(v) for v in v_i)
     delta = gamma_0/gamma
 
+    trace_length = int((10**stop)/(timestep*tao_c))
+
     df = pd.DataFrame({
         'CreationDate': [pd.Timestamp.now()],
-        'mass_total': [mass_total],
+        'a': [a],
+        'eta': [eta],
+        'rho_silica': [rho_silica],
+        'rho_f': [rho_f],
+        'sampling_rate': [(1.0/timestep)],
+        'stop': [stop],
+        'start': [start],
+        'track_len': [trace_length],
         'sample_rate': [sample_rate],
-        'timestep': [timestep],
         'tao_c': [tao_c],
         'v_c': [v_c],
         'x_c': [x_c]
     })
 
-    trace_length = int((10**stop)/(timestep*tao_c))
-
     # Run the analytics
     sol = Analytical_Solution(rho_f, c_water, eta, bulk, a, rho_silica, K, tao_f, mass, mass_total, gamma, temp, VSP_length, integ_points, time_range=time_range, time_points=time_points)
-    times, freq, VPSD_cw, VPSD_iw, PSD_iw, PSD_cw, VACF_cw, VACF_iw, PACF_cw, PACF_iw, TPSD_cw, TPSD_iw = sol.calculate()
+    times, freq, VPSD_iw, PSD_iw, VACF_iw, PACF_iw, TPSD_iw = sol.calculate()
 
     pacf = True
     vacf = True
@@ -79,7 +84,7 @@ def run():
     save = True
 
     # Run the simulation
-    mep = MarkovianEmbeddingProcess(n, v_i, gamma_i, delta, timestep, sample_rate, lag_fraction, temp=temp, mass=mass_total, gamma=gamma)
+    mep = MarkovianEmbeddingProcess(n, v_i, gamma_i, delta, timestep, sample_rate, lag_fraction, K=K, temp=temp, mass=mass_total, gamma=gamma)
     mep.run_numerical_simulation(simulation_number, trace_length, pacf, vacf, msd, psd, df, graph=False, save=save)
 
     # Graph
@@ -87,6 +92,7 @@ def run():
         VACF_iw/= (const.k * temp / mass_total)
         mep.graph_VACF(10**start, 10**stop)
         plt.plot(times, VACF_iw, label="Analytical")
+        plt.plot(times, sol.standalone_vacf(times)/(const.k * temp / mass_total), label="Standalone Analytical")
         plt.legend()
         plt.title("VACF")
         plt.xscale("log")
@@ -102,7 +108,7 @@ def run():
 
     if psd:
         mep.graph_PSD()
-        plt.semilogx(freq, VPSD_iw, label="Analytical")
+        plt.semilogx(freq, PSD_iw, label="Analytical")
         plt.legend()
         plt.xlim(1/10**stop, 1/10**start)
         plt.title("PSD")

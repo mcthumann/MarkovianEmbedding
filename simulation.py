@@ -9,7 +9,7 @@
 # TODO Figure out why the parameters n, b, c, v_0, were set as stated
 
 # TODO add the looping to the mep
-
+import scipy
 import math
 import numpy as np
 from numpy.fft import fft, ifft
@@ -27,7 +27,7 @@ class MarkovianEmbeddingProcess:
     """
     # First, we initialize x, v and u appropriately. Entries of u should be initialized by sampling randomly
     # from a gaussian distribution with mean 0 and variance gamma_i.
-    def __init__(self, n, v_i, gamma_i, delta, timestep, sample_rate, lag_fraction, temp=-1, mass=-1, gamma=-1):
+    def __init__(self, n, v_i, gamma_i, delta, timestep, sample_rate, lag_fraction, K = 0, temp=-1, mass=-1, gamma=-1):
         # Parameters
         self.n = n # Number of auxliary stochastic variables
         self.v_i = v_i
@@ -40,6 +40,7 @@ class MarkovianEmbeddingProcess:
         self.temp = temp
         self.mass = mass
         self.gamma = gamma
+        self.K = K
 
         self.t_c = 1
         self.x_c = 1
@@ -48,6 +49,7 @@ class MarkovianEmbeddingProcess:
             self.v_c = math.sqrt((const.k*self.temp)/self.mass)
             self.t_c = self.mass/self.gamma
             self.x_c = self.v_c*self.t_c
+            self.f_c = (const.k*self.temp)/(self.t_c*self.v_c)
 
         self.timestep = timestep
         # Single step variables
@@ -92,16 +94,19 @@ class MarkovianEmbeddingProcess:
         for k in range(self.sample_rate):
             N_i = np.random.normal(0,1, self.n+1)
             N_0 = sum([math.sqrt(self.gamma_i[j]/(self.v_i[j]*self.delta))*N_i[j] for j in range(self.n)])
-
             next_u = [((1 - self.v_i[j]*self.timestep)*curr_u[j] - self.gamma_i[j]*self.timestep*curr_v +
                        math.sqrt(2*self.gamma_i[j]*self.v_i[j]*self.timestep)*N_i[j]) for j in range(self.n)]
-            next_v = ((1 - (1+self.delta)*self.timestep)*curr_v + - self.timestep*sum(curr_u) +
+            next_v = ((1 - (1+self.delta)*self.timestep)*curr_v - self.timestep*sum(curr_u) -
+                      self.timestep*self.K*curr_x*(self.x_c/self.f_c) +
                       math.sqrt(2*self.timestep)*(math.sqrt(self.delta)*N_0 + N_i[self.n]))
             next_x = curr_x + self.timestep*curr_v
             curr_u = next_u
             curr_v = next_v
             curr_x = next_x
-
+        # print(const.k)
+        # print(self.v_c)
+        # print(self.t_c)
+        # print((self.v_c/((const.k * self.temp)/(self.v_c*self.t_c))))
         self.all_x[state_ind] = curr_x
         self.all_v[state_ind] = curr_v
         self.all_u[state_ind] = curr_u
@@ -191,20 +196,13 @@ class MarkovianEmbeddingProcess:
         self.all_pacf.append(acf)
 
     def compute_VACF(self, transient=0.0):
-        # Remove transient section
-        v = self.all_v[int(transient * len(self.all_v)):]
-        N = len(v)
-        max_lag = int(self.lag_fraction * N)
-
-        # Compute correlation using FFT for faster performance
-        f_v = fft(v, n=2 * N)  # zero-pad to double length to avoid aliasing
-        acf = ifft(f_v * np.conj(f_v)).real[:N]  # autocorrelation via inverse FFT
-        acf = acf[:max_lag]  # Keep positive lags only, up to max_lag
-
-        # Normalize by the number of terms contributing to each lag
-        acf /= np.arange(N, N - max_lag, -1)
-
-        self.all_vacf.append(acf)
+        series = self.all_x[int(transient * len(self.all_x)):]
+        v_series = np.diff(series)/self.timestep
+        # v_series -= np.mean(v_series)
+        f_signal = np.fft.fft(v_series, n=2 * len(v_series))
+        vacf = np.fft.ifft(f_signal * np.conjugate(f_signal)).real[:len(v_series)]
+        vacf /= len(self.all_x)
+        self.all_vacf.append(vacf)
 
     def compute_MSD(self, skip_lags=1, transient=0.0):
         # Apply transient trimming to the time trace
@@ -227,27 +225,21 @@ class MarkovianEmbeddingProcess:
         self.all_msd.append(msd)
 
     def compute_PSD(self, transient=0.0):
-        # Extract the velocity trace, excluding the transient portion if necessary
-        trace = np.array(self.all_v[int(transient * len(self.all_v)):])
-        # Compute the Fourier transform of the velocity data
-        fft_result = fft(trace)
-        # Compute the Power Spectral Density (PSD)
-        psd = np.abs(fft_result) ** 2 / len(trace)
-        # Generate the corresponding frequencies
-        freqs = np.fft.fftfreq(len(trace), d=self.timestep)
-        # Take only the positive frequencies and PSD values
-        positive_freqs = freqs[:len(freqs) // 2]
-        psd = psd[:len(psd) // 2]
+        trace = np.array(self.all_x[int(transient * len(self.all_x)):])
+
+        frequency, psd = scipy.signal.periodogram(trace, 1 / (self.timestep), scaling="density")
+        frequency /= self.t_c
+        psd *= (self.x_c**2)*self.t_c
+
         # Store or return the computed PSD
-        self.all_psd.append((positive_freqs, psd))
+        self.all_psd.append((frequency, psd))
 
     def graph_PSD(self):
         # Unpack and average the PSDs over all stored tuples
         all_psd_np = np.array([psd for _, psd in self.all_psd])
         mean_psd = np.mean(all_psd_np, axis=0)
-        mean_psd=mean_psd*((self.v_c**2)*self.t_c)
         # Frequencies should be the same for all PSDs, so just take the first one
-        positive_freqs = np.array(self.all_psd[0][0])/self.t_c
+        positive_freqs = np.array(self.all_psd[0][0])
 
         # Plot the mean PSD
         plt.plot(positive_freqs, mean_psd, label="Simulation")

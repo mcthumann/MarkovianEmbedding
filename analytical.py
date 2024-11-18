@@ -6,6 +6,7 @@ import pandas as pd
 plt.ticklabel_format(style='sci', axis='x', scilimits=(0,0), useMathText=True)
 import numpy as np
 import scipy
+import math
 
 class Analytical_Solution:
     def __init__(self, density, c, shear, bulk, a, particle_density, K, tau_f, m, M, gamma_s, T, VSP_length, integ_points, time_range=(-10, -5), time_points=60):
@@ -125,47 +126,84 @@ class Analytical_Solution:
     def calculate(self):
         power = np.linspace(0, 10.5, self.VSP_length)
         freq = (np.ones(self.VSP_length) * 10) ** power
-        VSPD_compressible = self.velocity_spectral_density(freq, self.admittance)
+        # VSPD_compressible = self.velocity_spectral_density(freq, self.admittance)
         VSPD_incompressible = self.velocity_spectral_density(freq, self.incompressible_admittance)
-        PSD_incompressible = VSPD_incompressible / freq ** 2
-        PSD_compressible = VSPD_compressible / freq ** 2
+        # PSD_incompressible = VSPD_incompressible / freq
+        PSD_incompressible = self.PSD_standalone(freq*2*math.pi)
+        # PSD_compressible = VSPD_compressible / freq
 
-        TPSD_compressible = self.thermal_force_PSD(freq, PSD_compressible, self.gamma(freq), self.m)
+        # TPSD_compressible = self.thermal_force_PSD(freq, PSD_compressible, self.gamma(freq), self.m)
         TPSD_incompressible = self.thermal_force_PSD(freq, PSD_incompressible, self.incompressible_gamma(freq), self.M)
 
-        VACF_compressible = self.ACF_from_SPD(self.admittance, self.velocity_spectral_density, self.times)
+        # VACF_compressible = self.ACF_from_SPD(self.admittance, self.velocity_spectral_density, self.times)
         VACF_incompressible = self.ACF_from_SPD(self.incompressible_admittance, self.velocity_spectral_density, self.times)
+        # VACF_incompressible = self.standalone_vacf(self.times)
 
-        PACF_compressible = self.ACF_from_SPD(self.admittance, self.position_spectral_density, self.times)
+        # PACF_compressible = self.ACF_from_SPD(self.admittance, self.position_spectral_density, self.times)
         PACF_incompressible = self.ACF_from_SPD(self.incompressible_admittance, self.position_spectral_density, self.times)
 
-        MSD_compressible = self.mean_square_displacement(PACF_compressible)
+        # MSD_compressible = self.mean_square_displacement(PACF_compressible)
         MSD_incompressible = self.mean_square_displacement(PACF_incompressible)
 
         confinement = self.K
         if self.K == 0:
             confinement = self.gamma_s
 
-        compress_correction = (self.k_b * self.T / confinement / PACF_compressible[0])
+        # compress_correction = (self.k_b * self.T / confinement / PACF_compressible[0])
         incompress_correction = (self.k_b * self.T / confinement / PACF_incompressible[0])
 
-        PACF_incompressible *= compress_correction
-        PACF_compressible *= incompress_correction
+        # PACF_incompressible *= compress_correction
+        # PACF_compressible *= incompress_correction
 
-        TPSD_compressible = self.thermal_force_PSD(freq, PSD_compressible, self.gamma(freq), self.m)
+        # TPSD_compressible = self.thermal_force_PSD(freq, PSD_compressible, self.gamma(freq), self.m)
         TPSD_incompressible = self.thermal_force_PSD(freq, PSD_incompressible, self.incompressible_gamma(freq), self.M)
 
-        return self.times, freq, VSPD_compressible, VSPD_incompressible, PSD_incompressible, PSD_compressible, VACF_compressible, VACF_incompressible, PACF_compressible, PACF_incompressible, TPSD_compressible, TPSD_incompressible
+        return self.times, freq, VSPD_incompressible, PSD_incompressible, VACF_incompressible, PACF_incompressible, TPSD_incompressible
 
+    def standalone_vacf(self, t):
+        t = t*(math.pi / 2)
+        t_k = (6 * math.pi * self.a * self.shear)/self.K
+        t_f = (self.density*self.a**2)/self.shear
+        t_p = self.M/(6 * math.pi * self.a * self.shear)
 
-    def shot_noise_VPSD(omega, sensitivity):
+        # find roots
+        # a * z^4 + b * z^3 + c * z^2 + d * z + e = 0
+        a = t_p + ((1/9.0)*t_f)
+        b = -np.sqrt(t_f)
+        c = 1
+        d = 0
+        e = 1 / t_k
+
+        # Coefficients array for the polynomial equation
+        coefficients = [a, b, c, d, e]
+
+        # Find the roots
+        roots = np.roots(coefficients)
+        # Calculate the VACF
+        vacf_complex = (self.k_b * self.T / self.M) * sum(
+            (z ** 3 * np.exp(z ** 2 * t) * scipy.special.erfc(z * np.sqrt(t))) /
+            (np.prod([z - z_j for z_j in roots if z != z_j])) for z in roots
+        )
+        return np.real(vacf_complex)
+
+    def shot_noise_VPSD(self, omega, sensitivity):
         return sensitivity * omega ** 2
 
 
-    def cumulative(SD):
+    def cumulative(self, SD):
         cumulative = np.zeros(len(SD))
         for i in range(len(SD)):
             for j in range(i):
                 cumulative[i] += SD[j]
 
         return cumulative
+
+    def PSD_standalone(self, omega):
+        # This is the PSD we look to fit.  We fit for 3 parameters
+        # Namely, we fit for the trap strength K, the radius of the particle a, and the voltage to position conversion V
+        gamma_s = 6 * math.pi * self.a * self.shear
+        tau_f = self.density * self.a ** 2 / self.shear
+        numerator = 2 * self.k_b * self.T * gamma_s * (1 + np.sqrt((1 / 2) * omega * tau_f))
+        denominator = (self.M*((self.K/self.M)-omega**2) - omega * gamma_s * np.sqrt((1 / 2) * omega * tau_f)) ** 2 + omega ** 2 * gamma_s ** 2 * (
+                1 + np.sqrt((1 / 2) * omega * tau_f)) ** 2
+        return numerator / denominator
