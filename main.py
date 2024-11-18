@@ -23,11 +23,11 @@ def run():
     mass_total = mass + .5 * (4 / 3) * math.pi * (a/2.0)** 3 * rho_f # Mass plus added mass
 
     temp = 293
-    K = 10
+    K = 1e-7
 
     lag_fraction = 1
     sample_rate = 1
-    simulation_number = 1
+    simulation_number = 2
 
     # ANALYTICAL PARAMETERS
     c_water = 1500
@@ -36,10 +36,9 @@ def run():
     VSP_length = 1000
     integ_points = 10 ** 4 * 8
     start = -10
-    stop = -5
+    stop = -4
     time_range = (start, stop)
-    time_points = 60
-
+    time_points = 600
 
     # HELPER PARAMETERS
     timestep = 1E-4  # Simulation timestep

@@ -197,26 +197,12 @@ class MarkovianEmbeddingProcess:
 
     def compute_VACF(self, transient=0.0):
         series = self.all_x[int(transient * len(self.all_x)):]
-        v_series = np.diff(series)/np.diff(np.arange(0, len(series)) * self.timestep)
+        v_series = np.diff(series)/self.timestep
+        # v_series -= np.mean(v_series)
         f_signal = np.fft.fft(v_series, n=2 * len(v_series))
         vacf = np.fft.ifft(f_signal * np.conjugate(f_signal)).real[:len(v_series)]
-        vacf = vacf*((const.k *self.temp)/self.mass)
+        vacf /= len(self.all_x)
         self.all_vacf.append(vacf)
-
-    def compute_VACF2(self, transient=0.0):
-        # Remove transient section
-        v = self.all_v[int(transient * len(self.all_v)):]
-        N = len(v)
-        max_lag = int(self.lag_fraction * N)
-
-        # Compute correlation using FFT for faster performance
-        f_v = fft(v, n=2 * N)  # zero-pad to double length to avoid aliasing
-        acf = ifft(f_v * np.conj(f_v)).real[:N]  # autocorrelation via inverse FFT
-        acf = acf[:max_lag]  # Keep positive lags only, up to max_lag
-
-        # Normalize by the number of terms contributing to each lag
-        acf /= np.arange(N, N - max_lag, -1)
-        self.all_vacf.append(acf)
 
     def compute_MSD(self, skip_lags=1, transient=0.0):
         # Apply transient trimming to the time trace

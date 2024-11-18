@@ -165,6 +165,7 @@ class Analytical_Solution:
         t_k = (6 * math.pi * self.a * self.shear)/self.K
         t_f = (self.density*self.a**2)/self.shear
         t_p = self.M/(6 * math.pi * self.a * self.shear)
+
         # find roots
         # a * z^4 + b * z^3 + c * z^2 + d * z + e = 0
         a = t_p + ((1/9.0)*t_f)
@@ -178,7 +179,6 @@ class Analytical_Solution:
 
         # Find the roots
         roots = np.roots(coefficients)
-        print(roots)
         # Calculate the VACF
         vacf_complex = (self.k_b * self.T / self.M) * sum(
             (z ** 3 * np.exp(z ** 2 * t) * scipy.special.erfc(z * np.sqrt(t))) /
