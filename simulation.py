@@ -36,6 +36,7 @@ class MarkovianEmbeddingProcess:
 
         # Optional Params
         self.sample_rate = sample_rate
+        print(self.sample_rate)
         self.lag_fraction = lag_fraction
         self.temp = temp
         self.mass = mass
@@ -123,8 +124,8 @@ class MarkovianEmbeddingProcess:
 
         for i in range(sim_num):
             print("Trace " + str(i) + ": ")
-            for j in range(trace_len):
-                if j%(int(trace_len/100))==0:
+            for j in range(int(trace_len/self.sample_rate)):
+                if j%(int((trace_len/self.sample_rate)/100))==0:
                     print("#", end="-")
                 self.compute_next_state(j)
             if graph:
@@ -134,7 +135,7 @@ class MarkovianEmbeddingProcess:
                 self.compute_PACF()
             if vacf:
                 print("Computing VACF")
-                self.compute_VACF()
+                self.compute_VACF_time_domain()
             if msd:
                 print("Computing MSD")
                 self.compute_MSD()
@@ -145,7 +146,7 @@ class MarkovianEmbeddingProcess:
             # save off data
             if save:
                 # Create a temporary DataFrame for this trace
-                temp_df = pd.DataFrame({'Position ' + str(i): self.all_x, 'Velocity ' + str(i): self.all_v})
+                temp_df = pd.DataFrame({'Position ' + str(i): self.all_x*self.x_c, 'Velocity ' + str(i): self.all_v*self.v_c})
 
                 if df.empty:
                     # If the main DataFrame is empty, just set it equal to the temp_df
@@ -195,13 +196,27 @@ class MarkovianEmbeddingProcess:
         # Append the computed PACF for this trace
         self.all_pacf.append(acf)
 
-    def compute_VACF(self, transient=0.0):
-        series = self.all_x[int(transient * len(self.all_x)):]
-        v_series = np.diff(series)/self.timestep
-        # v_series -= np.mean(v_series)
-        f_signal = np.fft.fft(v_series, n=2 * len(v_series))
-        vacf = np.fft.ifft(f_signal * np.conjugate(f_signal)).real[:len(v_series)]
-        vacf /= len(self.all_x)
+    # def compute_VACF(self, transient=0.0):
+    #     series = self.all_x[int(transient * len(self.all_x)):]
+    #     v_series = np.diff(series)/self.timestep
+    #     # v_series -= np.mean(v_series)
+    #     f_signal = np.fft.fft(v_series, n=2 * len(v_series))
+    #     vacf = np.fft.ifft(f_signal * np.conjugate(f_signal)).real[:len(v_series)]
+    #     vacf /= len(self.all_x)*self.sample_rate
+    #     self.all_vacf.append(vacf)
+
+    def compute_VACF_time_domain(self, transient=0.0):
+
+        # series = self.all_x
+        v_series = self.all_v * self.v_c
+
+        n = len(v_series)
+        vacf = np.zeros(n)
+        # Compute VACF with normalization
+        for lag in range(n):
+            vacf[lag] = np.dot(v_series[:n - lag], v_series[lag:]) / (
+                        n - lag)  # Normalize by number of overlapping terms
+
         self.all_vacf.append(vacf)
 
     def compute_MSD(self, skip_lags=1, transient=0.0):
@@ -227,7 +242,7 @@ class MarkovianEmbeddingProcess:
     def compute_PSD(self, transient=0.0):
         trace = np.array(self.all_x[int(transient * len(self.all_x)):])
 
-        frequency, psd = scipy.signal.periodogram(trace, 1 / (self.timestep), scaling="density")
+        frequency, psd = scipy.signal.periodogram(trace, 1 / (self.timestep*self.sample_rate), scaling="density")
         frequency /= self.t_c
         psd *= (self.x_c**2)*self.t_c
 
