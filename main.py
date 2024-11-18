@@ -23,11 +23,11 @@ def run():
     mass_total = mass + .5 * (4 / 3) * math.pi * (a/2.0)** 3 * rho_f # Mass plus added mass
 
     temp = 293
-    K = 1e-7
+    K = 1e-1
 
     lag_fraction = 1
     sample_rate = 1
-    simulation_number = 2
+    simulation_number = 5
 
     # ANALYTICAL PARAMETERS
     c_water = 1500
@@ -36,7 +36,7 @@ def run():
     VSP_length = 1000
     integ_points = 10 ** 4 * 8
     start = -10
-    stop = -4
+    stop = -5
     time_range = (start, stop)
     time_points = 600
 
@@ -74,7 +74,7 @@ def run():
     })
 
     # Run the analytics
-    sol = Analytical_Solution(rho_f, c_water, eta, bulk, a, rho_silica, K, tao_f, mass, mass_total, gamma, temp, VSP_length, integ_points, time_range=time_range, time_points=time_points)
+    sol = Analytical_Solution(rho_f, c_water, eta, bulk, a, rho_silica, K, tao_f, mass, mass_total, gamma, temp, VSP_length, integ_points, time_range=time_range, time_points=time_points, sample_rate=sample_rate)
     times, freq, VPSD_iw, PSD_iw, VACF_iw, PACF_iw, TPSD_iw = sol.calculate()
 
     pacf = True
@@ -89,10 +89,12 @@ def run():
 
     # Graph
     if vacf:
-        VACF_iw/= (const.k * temp / mass_total)
+        # VACF_iw /= VACF_iw[0]
+        vacf_s = sol.standalone_vacf(times)
+        # vacf_s /= vacf_s[1]
         mep.graph_VACF(10**start, 10**stop)
         plt.plot(times, VACF_iw, label="Analytical")
-        plt.plot(times, sol.standalone_vacf(times)/(const.k * temp / mass_total), label="Standalone Analytical")
+        plt.plot(times, vacf_s, label="Standalone Analytical")
         plt.legend()
         plt.title("VACF")
         plt.xscale("log")

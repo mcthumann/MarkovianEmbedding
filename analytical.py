@@ -9,7 +9,7 @@ import scipy
 import math
 
 class Analytical_Solution:
-    def __init__(self, density, c, shear, bulk, a, particle_density, K, tau_f, m, M, gamma_s, T, VSP_length, integ_points, time_range=(-10, -5), time_points=60):
+    def __init__(self, density, c, shear, bulk, a, particle_density, K, tau_f, m, M, gamma_s, T, VSP_length, integ_points, time_range=(-10, -5), time_points=60, sample_rate=1):
         self.density = density
         self.c = c
         self.shear = shear
@@ -27,14 +27,14 @@ class Analytical_Solution:
         self.integ_points = integ_points
         self.time_range = time_range
         self.time_points = time_points
+        self.sample_rate = sample_rate
 
         # Automatically calculate frequencies based on times
         self.times, self.frequencies = self.set_times_and_frequencies()
 
     def set_times_and_frequencies(self):
         # Generate time values logarithmically spaced
-        times = np.logspace(self.time_range[0], self.time_range[1], self.time_points)
-
+        times = np.logspace((self.time_range[0]), self.time_range[1], self.time_points)
         # Maximum and minimum times determine the frequency range
         t_min = np.min(times)
         t_max = np.max(times)
@@ -124,6 +124,8 @@ class Analytical_Solution:
 
 
     def calculate(self):
+        sampling_cutoff = self.sample_rate*(10**self.time_range[0])
+        times = self.times[self.times >= sampling_cutoff]
         power = np.linspace(0, 10.5, self.VSP_length)
         freq = (np.ones(self.VSP_length) * 10) ** power
         # VSPD_compressible = self.velocity_spectral_density(freq, self.admittance)
@@ -136,11 +138,11 @@ class Analytical_Solution:
         TPSD_incompressible = self.thermal_force_PSD(freq, PSD_incompressible, self.incompressible_gamma(freq), self.M)
 
         # VACF_compressible = self.ACF_from_SPD(self.admittance, self.velocity_spectral_density, self.times)
-        VACF_incompressible = self.ACF_from_SPD(self.incompressible_admittance, self.velocity_spectral_density, self.times)
+        VACF_incompressible = self.ACF_from_SPD(self.incompressible_admittance, self.velocity_spectral_density, times)
         # VACF_incompressible = self.standalone_vacf(self.times)
 
         # PACF_compressible = self.ACF_from_SPD(self.admittance, self.position_spectral_density, self.times)
-        PACF_incompressible = self.ACF_from_SPD(self.incompressible_admittance, self.position_spectral_density, self.times)
+        PACF_incompressible = self.ACF_from_SPD(self.incompressible_admittance, self.position_spectral_density, times)
 
         # MSD_compressible = self.mean_square_displacement(PACF_compressible)
         MSD_incompressible = self.mean_square_displacement(PACF_incompressible)
@@ -158,7 +160,7 @@ class Analytical_Solution:
         # TPSD_compressible = self.thermal_force_PSD(freq, PSD_compressible, self.gamma(freq), self.m)
         TPSD_incompressible = self.thermal_force_PSD(freq, PSD_incompressible, self.incompressible_gamma(freq), self.M)
 
-        return self.times, freq, VSPD_incompressible, PSD_incompressible, VACF_incompressible, PACF_incompressible, TPSD_incompressible
+        return times, freq, VSPD_incompressible, PSD_incompressible, VACF_incompressible, PACF_incompressible, TPSD_incompressible
 
     def standalone_vacf(self, t):
         t = t*(math.pi / 2)
