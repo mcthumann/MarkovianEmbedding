@@ -23,11 +23,11 @@ def run():
     mass_total = mass + .5 * (4 / 3) * math.pi * (a/2.0)** 3 * rho_f # Mass plus added mass
 
     temp = 293
-    K = 1e-1
+    K = 1
 
     lag_fraction = 1
     sample_rate = 1
-    simulation_number = 5
+    simulation_number = 3
 
     # ANALYTICAL PARAMETERS
     c_water = 1500
@@ -78,7 +78,7 @@ def run():
     times, freq, VPSD_iw, PSD_iw, VACF_iw, PACF_iw, TPSD_iw = sol.calculate()
 
     pacf = True
-    vacf = True
+    vacf = False
     msd = False
     psd = True
     save = True
@@ -89,15 +89,14 @@ def run():
 
     # Graph
     if vacf:
-        # VACF_iw /= VACF_iw[0]
         vacf_s = sol.standalone_vacf(times)
-        # vacf_s /= vacf_s[1]
         mep.graph_VACF(10**start, 10**stop)
         plt.plot(times, VACF_iw, label="Analytical")
         plt.plot(times, vacf_s, label="Standalone Analytical")
         plt.legend()
         plt.title("VACF")
         plt.xscale("log")
+        plt.xlim(left = 1e-7, right = 1e-5)
         plt.show()
 
     if pacf:
@@ -120,19 +119,20 @@ def run():
         mep.graph_MSD()
         plt.title("MSD")
         plt.show()
-
+    #
     # # Find spots where velocity is zero
     # index_mult = (timestep * sample_rate) * tao_c
     # plt.plot([t * index_mult for t in range(len(mep.all_x))], mep.all_x * x_c, linewidth=0.5)
-    #
-    # tolerance = .0001
-    # close_to_zero_indices = np.where(abs(mep.all_v) < tolerance)[0]
-    #
+    # print(mep.all_x)
+    # tolerance = (np.std(mep.all_v))
+    # close_to_zero_indices = np.where(abs(mep.all_v - np.mean(mep.all_v)) < tolerance)[0]
+    # print("zero idx: " + str(close_to_zero_indices))
     # plt.title("Positions")
     # # Draw vertical lines where values are close to zero
     # for index in close_to_zero_indices:
     #     plt.axvline(x=index*index_mult, color='red', linestyle='-', linewidth=0.1)
-    # plt.show()
+
+    plt.show()
 
 if __name__ == '__main__':
     run()

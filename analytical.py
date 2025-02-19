@@ -163,29 +163,33 @@ class Analytical_Solution:
         return times, freq, VSPD_incompressible, PSD_incompressible, VACF_incompressible, PACF_incompressible, TPSD_incompressible
 
     def standalone_vacf(self, t):
-        t = t*(math.pi / 2)
-        t_k = (6 * math.pi * self.a * self.shear)/self.K
-        t_f = (self.density*self.a**2)/self.shear
-        t_p = self.M/(6 * math.pi * self.a * self.shear)
+        t = t * (math.pi / 2)
+        t_k = (6 * math.pi * self.a * self.shear) / self.K
+        t_f = (self.density * self.a ** 2) / self.shear
+        t_p = self.M / (6 * math.pi * self.a * self.shear)
 
-        # find roots
-        # a * z^4 + b * z^3 + c * z^2 + d * z + e = 0
-        a = t_p + ((1/9.0)*t_f)
+        # Polynomial coefficients
+        a = t_p + (1 / 9.0) * t_f
         b = -np.sqrt(t_f)
         c = 1
         d = 0
         e = 1 / t_k
-
-        # Coefficients array for the polynomial equation
+        # Polynomial coefficients
         coefficients = [a, b, c, d, e]
 
-        # Find the roots
-        roots = np.roots(coefficients)
-        # Calculate the VACF
-        vacf_complex = (self.k_b * self.T / self.M) * sum(
-            (z ** 3 * np.exp(z ** 2 * t) * scipy.special.erfc(z * np.sqrt(t))) /
-            (np.prod([z - z_j for z_j in roots if z != z_j])) for z in roots
-        )
+        # Scale coefficients to stabilize roots
+        max_coeff = max(abs(c) for c in coefficients)  # Corrected line
+        coefficients_scaled = [c / max_coeff for c in coefficients]
+        roots = np.roots(coefficients_scaled)
+
+        # Calculate VACF
+        vacf_complex = 0
+        for z in roots:
+            prod_diffs = np.prod([(z - z_j) for z_j in roots if not np.isclose(z, z_j)])
+            erfc_term = scipy.special.erfcx(z * np.sqrt(t))  # Stable erfc computation
+            vacf_complex += (z ** 3 * erfc_term) / prod_diffs
+
+        vacf_complex *= (self.k_b * self.T / self.M)
         return np.real(vacf_complex)
 
     def shot_noise_VPSD(self, omega, sensitivity):

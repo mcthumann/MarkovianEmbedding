@@ -207,8 +207,8 @@ class MarkovianEmbeddingProcess:
 
     def compute_VACF_time_domain(self, transient=0.0):
 
-        # series = self.all_x
-        v_series = self.all_v * self.v_c
+        v_series = (np.diff(self.all_x)/self.timestep)*self.v_c
+        # v_series = self.all_v * self.v_c
 
         n = len(v_series)
         vacf = np.zeros(n)
@@ -272,8 +272,9 @@ class MarkovianEmbeddingProcess:
     def graph_VACF(self, start, stop):
         all_vacf_np = np.array(self.all_vacf)
         mean_vacf = np.mean(all_vacf_np, axis=0)
-        plt.plot([t*(self.timestep*self.sample_rate)*self.t_c for t in range(np.size(mean_vacf))], mean_vacf, label="Simulation")
+        plt.plot([t*(self.timestep*self.sample_rate)*self.t_c for t in range(np.size(mean_vacf))], mean_vacf, label=f"Simulation")
         plt.xlim(start, stop)
+
 
     def graph_MSD(self):
         all_msd_np = np.array(self.all_msd)
