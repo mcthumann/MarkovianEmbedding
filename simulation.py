@@ -104,6 +104,7 @@ class MarkovianEmbeddingProcess:
             curr_u = next_u
             curr_v = next_v
             curr_x = next_x
+
         # print(const.k)
         # print(self.v_c)
         # print(self.t_c)

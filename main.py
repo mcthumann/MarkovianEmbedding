@@ -14,16 +14,18 @@ def run():
     b = 5 # Scaling dilation parameter that determines the low cutoff frequency ν_0*b^-n
     c = 1.78167 # a prefactor that depends on the particular choice of b
     v_0 = 1e3 # High cutoff frequency (already scaled by tao_c)
-    a = 3e-6 # Particle size
-    eta = 1e-3 # Viscosity of water
+    a = 4.464e-6 # Particle size
+    eta = 0.36e-3 # ACETONE 1e-3 # Viscosity of water
+    rho_bati = 4400
     rho_silica = 2200 # Density of silica
+    rho_acetone = 789
     rho_f = 1000 # Density of water
 
-    mass = (4 / 3) * math.pi * (a / 2.0) ** 3 * rho_silica
-    mass_total = mass + .5 * (4 / 3) * math.pi * (a/2.0)** 3 * rho_f # Mass plus added mass
+    mass = (4 / 3) * math.pi * a** 3 * rho_bati
+    mass_total = mass + .5 * (4 / 3) * math.pi * a**3 * rho_acetone # Mass plus added mass
 
     temp = 293
-    K = 1
+    K = 1 # Does K do anything?
 
     lag_fraction = 1
     sample_rate = 1
@@ -31,12 +33,14 @@ def run():
 
     # ANALYTICAL PARAMETERS
     c_water = 1500
-    bulk = 2.5E-3
+    c_acetone = 1174
+    bulk_acetone = 1.4e-3
+    # bulk = 2.5E-3
 
     VSP_length = 1000
     integ_points = 10 ** 4 * 8
     start = -10
-    stop = -5
+    stop = -4
     time_range = (start, stop)
     time_points = 600
 
@@ -44,8 +48,8 @@ def run():
     timestep = 1E-4  # Simulation timestep
     gamma = 6*math.pi*a*eta # Steady-state friction coefficient of the particle
     tao_c = (mass_total/gamma) # Momentum relaxation time of the particle
-    #tao_f = (rho_f * (a ** 2)) / (eta)  # Characteristic time for vorticy diffusion across length of sphere
-    tao_f = (9*tao_c/(2*(rho_silica/rho_f)*+1))
+    #tao_f = (rho_acetone * (a ** 2)) / (eta)  # Characteristic time for vorticy diffusion across length of sphere
+    tao_f = (9*tao_c/(2*(rho_bati/rho_acetone)*+1))
     tao_fc = tao_f/tao_c
     v_c = math.sqrt((const.k*temp)/mass_total)
     x_c = tao_c*v_c
@@ -61,8 +65,8 @@ def run():
         'CreationDate': [pd.Timestamp.now()],
         'a': [a],
         'eta': [eta],
-        'rho_silica': [rho_silica],
-        'rho_f': [rho_f],
+        'rho_bati': [rho_bati],
+        'rho_f': [rho_acetone],
         'sampling_rate': [(1.0/timestep)],
         'stop': [stop],
         'start': [start],
@@ -74,12 +78,12 @@ def run():
     })
 
     # Run the analytics
-    sol = Analytical_Solution(rho_f, c_water, eta, bulk, a, rho_silica, K, tao_f, mass, mass_total, gamma, temp, VSP_length, integ_points, time_range=time_range, time_points=time_points, sample_rate=sample_rate)
+    sol = Analytical_Solution(rho_acetone, c_acetone, eta, bulk_acetone, a, rho_bati, K, tao_f, mass, mass_total, gamma, temp, VSP_length, integ_points, time_range=time_range, time_points=time_points, sample_rate=sample_rate)
     times, freq, VPSD_iw, PSD_iw, VACF_iw, PACF_iw, TPSD_iw = sol.calculate()
 
     pacf = True
-    vacf = False
-    msd = False
+    vacf = True
+    msd = True
     psd = True
     save = True
 
